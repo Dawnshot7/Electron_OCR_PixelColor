@@ -1,59 +1,74 @@
-# Electron RobotJS Pixel Color Monitor
-
-## Description
-
-This Electron application utilizes RobotJS to monitor and retrieve the color of a specific pixel on the screen in real time. The application communicates pixel color data between the main process and the renderer process using IPC (Inter-Process Communication). The monitored pixel's color is displayed in the app's user interface, updating every second.
+# Electron Pixel Color OCR
+This project allows you to capture a specific region of the screen using mouse clicks, extract text using OCR (Optical Character Recognition), and update the OCR region dynamically using AutoHotkey (AHK) for capturing the coordinates.
 
 ## Features
+- OCR-based screen capture: Capture a selected region of the screen and perform OCR to extract text from it.
+- Dynamic region selection: Use mouse clicks to select the region for OCR and update the OCR region in real time.
+- Integration with AutoHotkey: Use an AutoHotkey script to capture mouse coordinates for defining the OCR region.
 
-- Monitors the color of a specified pixel on the screen.
-- Displays pixel color data in the user interface.
-- Uses Electron for a cross-platform desktop application.
-- Implements IPC for communication between the main and renderer processes.
+## Prerequisites
+- Before you begin, ensure you have the following installed:
 
-## Technologies Used
+    - Node.js (v16.x or above)
+    - Electron (17.x or below for compatibility with robotjs if you're using it)
+    - AutoHotkey (v1.x for the scripts used in this project)
+    - ocrad.js (for OCR processing)
 
-- Electron: Framework for building cross-platform desktop applications with web technologies.
-- RobotJS: A native Node.js library for controlling the mouse, keyboard, and retrieving pixel color data.
-- HTML/CSS/JavaScript: Standard web technologies used for building the application's user interface.
+- You can install the required Node.js packages by running the following command:
 
-## Installation
-
-To set up the project locally, follow these steps:
-
-1. Clone the repository:
-    git clone <YOUR_REPOSITORY_URL>
-
-2. Navigate to the project directory:
-    cd Electron_Robotjs_Tesseract
-
-3. Install the dependencies:
+    bash
     npm install
 
-4. Rebuild the RobotJS module:
-    npx electron-rebuild
+## Dependencies:
+- ocrad.js: A JavaScript-based OCR tool for extracting text from images.
+- AutoHotkeyA32.exe: For executing AutoHotkey scripts to capture mouse coordinates.
 
-5. Run the application:
-    npm start
+## Project Setup
+- Clone this repository:
 
-## Usage
+    bash
+    git clone https://github.com/yourusername/Electron_PixelColor_OCR.git
+    cd Electron_PixelColor_OCR
 
-1. Launch the application.
-2. The pixel color at the specified coordinates will be monitored and updated every second.
-3. The current color will be displayed in the "Color at (x, y): <color>" format in the application window.
+- Install dependencies:
 
-## Configuration
-You can modify the pixel coordinates in the main.js file to monitor different pixels. Look for the following section:
+    bash
+    npm install
 
-    const { x, y } = { x: 100, y: 100 }; // Change as needed
+- Ensure you have AutoHotkey installed on your system, and place AutoHotkeyA32.exe and the AutoHotkey script (getBoxCoords.ahk) in the scripts folder.
+
+- Update the paths in your main.js file to reflect the location of AutoHotkeyA32.exe and the AHK script.
+
+## How It Works
+
+- OCR Region Setup:
+
+    - The user clicks the "Start Capture" button in the Electron window to begin selecting the OCR region.
+    - The user clicks and releases the left mouse button on the screen to define the coordinates for the OCR region.
+    - These coordinates are captured by an AutoHotkey script and returned to the Electron app.
+
+- OCR Extraction:
+
+    - The Electron app uses the coordinates received from AutoHotkey to define the region for OCR.
+    - The OCR tool (ocrad.js) is then used to extract text from the captured region.
+
+- AutoHotkey Script:
+
+    - The AHK script (getBoxCoords.ahk) waits for the left mouse button to be pressed and released.
+    - It captures the x,y coordinates of the mouse clicks and outputs them to standard output (stdout).
+    - These coordinates are sent back to the Electron app and used to update the OCR region.
+
+## Example Usage
+- Start Capture: Click the "Start Capture" button in the Electron window.
+- Select OCR Region: Click and release the left mouse button to define the coordinates for the OCR region.
+- OCR Output: The extracted text from the selected region will be printed to the console or displayed in the app.
+
+## Files and Structure
+- main.js: The main Electron app logic, including spawning the AutoHotkey script and handling OCR extraction.
+- renderer.js: Handles the front-end logic, including the event listener for the "Start Capture" button and mouse click events.
+- getBoxCoords.ahk: AutoHotkey script that captures the coordinates of the mouse clicks.
+- ocrad.js: The OCR tool for extracting text from images within the defined region.
 
 ## Troubleshooting
-- If you encounter issues with the RobotJS module, ensure you have the correct Python version (Python 2.7) and build tools installed on your system.
-- Refer to the RobotJS documentation for additional troubleshooting steps.
-
-## License
-This project is licensed under the MIT License. See the LICENSE file for details.
-
-## Acknowledgements
-- Electron
-- RobotJS
+- No OCR Output: Make sure the ocrad.js OCR region coordinates are correct and the OCR tool is functioning properly.
+- No Coordinates from AHK: Ensure that AutoHotkeyA32.exe is running correctly and the getBoxCoords.ahk script is properly outputting coordinates.
