@@ -1,0 +1,22 @@
+{
+  "name": "electron_robotjs_tesseract",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@electron/rebuild": "^3.7.0",
+    "electron": "^17.4.11"
+  },
+  "dependencies": {
+    "canvas": "^3.0.0-rc2",
+    "ocrad.js": "^0.0.1",
+    "pngjs": "^7.0.0",
+    "robotjs": "^0.6.0"
+  }
+}
