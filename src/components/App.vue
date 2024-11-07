@@ -1,39 +1,67 @@
-<!-- src/components/App.vue -->
 <template>
-  <div id="app" class="container mt-4">
-    <h1 class="mb-3">Pixel Color Data with OCR</h1>
-    <!-- Use a BootstrapVue button component -->
-    <b-button @click="startCapture" variant="primary">Start OCR Region Capture</b-button>
-    <div id="color-info" class="mt-3">{{ colorInfo }}</div>
-    <div id="ocrText" class="mt-1">{{ ocrText }}</div>
+  <div class="app-container">
+    <!-- Sidebar for tab switching -->
+    <b-nav vertical class="sidebar">
+      <b-nav-item @click="currentTab = 'OCRConfigurator'" :active="currentTab === 'OCRConfigurator'">
+        OCR Configurator
+      </b-nav-item>
+      <b-nav-item @click="currentTab = 'PixelSelector'" :active="currentTab === 'PixelSelector'">
+        Pixel Selector
+      </b-nav-item>
+    </b-nav>
+
+    <!-- Main Content Area -->
+    <div class="content-area">
+      <component :is="currentTabComponent" />
+    </div>
   </div>
 </template>
 
 <script>
+import OCRConfigurator from './OCRConfigurator.vue';
+import PixelSelector from './PixelSelector.vue';
+
 export default {
+  name: 'App',
+  components: {
+    OCRConfigurator,
+    PixelSelector,
+  },
   data() {
     return {
-      colorInfo: "Start color",
-      ocrText: "Start OCR",
+      currentTab: 'OCRConfigurator',
     };
   },
-  methods: {
-    startCapture() {
-      window.electronAPI.startCapture();
+  computed: {
+    currentTabComponent() {
+      return this.currentTab === 'OCRConfigurator' ? OCRConfigurator : PixelSelector;
     },
-  },
-  mounted() {
-    window.electronAPI.onPixelColor((event, pixelData) => {
-      const { x, y, color, ocrText } = pixelData;
-      this.colorInfo = `Color at (${x}, ${y}): ${color}`;
-      this.ocrText = `Text in box: ${ocrText || 'No text found'}`;
-    });
   },
 };
 </script>
 
 <style scoped>
-#app {
-  font-family: Arial, sans-serif;
+.app-container {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 200px; /* Fixed width for sidebar (adjust if needed) */
+  background-color: #f8f9fa;
+  padding: 1rem;
+  box-sizing: border-box;
+  /* Prevent sidebar from shrinking */
+  flex-shrink: 0;
+}
+
+.content-area {
+  flex-grow: 1;
+  padding: 1rem;
+  overflow: auto;
+}
+
+b-nav-item {
+  white-space: nowrap; /* Prevent text wrapping on buttons */
 }
 </style>
