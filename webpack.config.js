@@ -4,6 +4,7 @@ const path = require('path');
 
 module.exports = {
   entry: './src/renderer/renderer.js',
+  mode: 'development',
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'renderer.bundle.js'

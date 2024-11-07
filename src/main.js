@@ -1,5 +1,6 @@
 // Import necessary modules from Electron and RobotJS
 const { app, BrowserWindow } = require('electron'); // Electron APIs
+const { ipcMain } = require('electron'); // Listen for coordinate updates from renderer process
 const robot = require('robotjs'); // RobotJS for controlling input devices and getting pixel color
 const fs = require('fs'); // Add fs to write files
 const path = require('path'); // Module for handling and transforming file paths
@@ -9,15 +10,12 @@ const { PNG } = require('pngjs'); // Add PNG for handling PNG format
 const { spawn } = require('child_process');
 const Jimp = require('jimp');
 
-// Requires Electron v17.4.11
+// Robotjs requires Electron v17.4.11
 
 let win; // Variable to hold the reference to the main application window
 
 // Define a variable to store the OCR region
 let ocrRegion = { x: 0, y: 300, width: 250, height: 300 };  // Default OCR region
-
-// Listen for coordinate updates from renderer process
-const { ipcMain } = require('electron');
 
 /**
  * Function to create the main application window.
