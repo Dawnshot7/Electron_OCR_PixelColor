@@ -7,6 +7,7 @@ const OCRAD = require('ocrad.js');  // Import OCRAD.js
 const { createCanvas, Image } = require('canvas');
 const { PNG } = require('pngjs'); // Add PNG for handling PNG format
 const { spawn } = require('child_process');
+const Jimp = require('jimp');
 
 // Requires Electron v17.4.11
 

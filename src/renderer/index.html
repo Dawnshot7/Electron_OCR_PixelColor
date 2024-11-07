@@ -6,11 +6,10 @@
   <title>RobotJS in Electron</title>
 </head>
 <body>
-  <h1>Pixel Color Data</h1>
-  <button id="startCaptureButton">Start OCR Region Capture</button>
-  <div id="color-info">Start color</div> <!-- Element to display pixel color data -->
-  <div id="ocrText">Start OCR</div> <!-- Element to display OCR text -->
-  <!-- Include the renderer.js script -->
-  <script src="renderer.js"></script>
+  <!-- Vue will mount here -->
+  <div id="app"></div>
+
+  <!-- Include renderer.js to bootstrap the Vue app -->
+  <script src="../../dist/renderer.bundle.js"></script>
 </body>
 </html>
