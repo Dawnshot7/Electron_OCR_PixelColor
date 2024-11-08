@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   startCapturePixel: () => ipcRenderer.send('start-capture-pixel'),
   startCaptureBox: () => ipcRenderer.send('start-capture-box'),
 
-  onUpdateVariables: (callback) => ipcRenderer.on('updateVariables', callback),
-  // Add method to update variable in main process
+  onupdateConfig: (callback) => ipcRenderer.on('updateConfig', (event, data) => callback(data)),
+  onupdateList: (callback) => ipcRenderer.on('updateList', (event, data) => callback(data)),
   updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value }),
 });

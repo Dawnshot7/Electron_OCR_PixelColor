@@ -33,8 +33,8 @@ const state = {
  */
 function createWindow() {
   win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1600,
+    height: 1200,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true, // Important for enabling IPC usage
@@ -193,13 +193,11 @@ ipcMain.on('update-variable', (event, { variableName, key, value }) => {
       state[variableName][key] = { ...state[variableName][key], ...value };
       console.log(`Updated state[${variableName}][${key}]:`, state[variableName][key]);
     }
-    if (key === 'selected') {
-      const selectedValues = state[variableName][value.region];
-      win.webContents.send('updateVariables', { selectedValues });
-    }
-    if (key === 'component') {
-      const selectedValues = state[variableName][value.region];
-      win.webContents.send('updateVariables', { selectedValues });
+    if (key === 'selected' ) {
+      const selectedRegion = state[variableName].selected.region;
+      const selectedValues = state[variableName][selectedRegion];
+      win.webContents.send('updateConfig', { selectedValues });
+      console.log(`Main replied: ${selectedValues}`);
     }
   } catch (error) {
     console.error('Error updating variable:', error);
