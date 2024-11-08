@@ -5,7 +5,7 @@
       <b-button @click="startCapturePixel" variant="primary">Start Pixel Coordinate Capture</b-button>
   
       <!-- Display pixel color and OCR text -->
-      <div id="color-info" class="mt-3">{{ colorInfo }}</div>
+      <div id="color-info" class="mt-1">{{ colorInfo }}</div>
     </div>
   </template>
   

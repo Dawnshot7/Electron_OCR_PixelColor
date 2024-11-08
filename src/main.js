@@ -18,11 +18,12 @@ let win; // Variable to hold the reference to the main application window
 let ocrRegion = { x: 0, y: 300, width: 250, height: 300 };  // Default OCR region
 
 // Define a variable to store the Pixel coordinate
-let pixelCoord = { x: 50, y: 50 };  // Default OCR region
+let pixelCoord = { x: 50, y: 50 };  // Default Pixel 
 
 /**
  * Function to create the main application window.
  * Initializes the window and sets up its properties.
+ * Initiates pixel checks and OCR every 1000ms and delivers results to components through IPC.
  */
 function createWindow() {
     win = new BrowserWindow({
@@ -38,35 +39,28 @@ function createWindow() {
     // Load the HTML file for the renderer process
     win.loadFile('src/renderer/index.html');
 
-  // Set an interval to monitor the pixel color and OCR every 3 seconds
+  // Set an interval to monitor the pixel color and OCR repeatedly
   setInterval(async () => {
-    const { x, y } = { x: pixelCoord.x, y: pixelCoord.y }; // Coordinates of the pixel to monitor (modifiable)
-    const color = robot.getPixelColor(pixelCoord.x, pixelCoord.y); // Get the pixel color at the specified coordinates
+    // Get the pixel color at the specified coordinates
+    const color = robot.getPixelColor(pixelCoord.x, pixelCoord.y); 
 
     // Perform OCR and capture text in the specified region
     const ocrText = await captureAndRecognize();
-    //const ocrText = "testing"; 
-    //console.log(`Color at (100, 100): ${color}`);
 
     // Send the pixel color and OCR data to the renderer process via IPC
-    win.webContents.send('pixelColor', { x, y, color }); // Sending both pixel and OCR data
-    win.webContents.send('ocrText', { ocrText }); // Sending both pixel and OCR data
-  }, 1000); // Interval set to 3000 milliseconds (3 seconds)
+    const { x, y } = { x: pixelCoord.x, y: pixelCoord.y }; // Coordinates of the pixel being monitored 
+    win.webContents.send('pixelColor', { x, y, color }); // Sending pixel data
+    win.webContents.send('ocrText', { ocrText }); // Sending OCR data
+  }, 1000); // Interval set to 1000 milliseconds 
 }
 
-// Function to convert the robotjs screenshot to PNG and save it
-function saveScreenshotAsPNG(screenshot, filePath) {
-  return new Promise((resolve, reject) => {
-      const png = new PNG({ width: screenshot.width, height: screenshot.height });
-      png.data = Buffer.from(screenshot.image);
-      
-      const buffer = PNG.sync.write(png);
-      fs.writeFile(filePath, buffer, (err) => {
-          if (err) reject(err);
-          else resolve();
-      });
-  });
-}
+// Event listener for when the application is ready
+app.on('ready', createWindow);
+
+// Quit the app when all windows are closed, unless on macOS
+app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+});
 
 // Function to capture a specific area of the screen and recognize text
 async function captureAndRecognize() {
@@ -101,13 +95,19 @@ async function captureAndRecognize() {
   }
 }
 
-// Event listener for when the application is ready
-app.on('ready', createWindow);
-
-// Quit the app when all windows are closed, unless on macOS
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') app.quit();
-});
+// Function to convert the robotjs screenshot to PNG and save it
+function saveScreenshotAsPNG(screenshot, filePath) {
+  return new Promise((resolve, reject) => {
+      const png = new PNG({ width: screenshot.width, height: screenshot.height });
+      png.data = Buffer.from(screenshot.image);
+      
+      const buffer = PNG.sync.write(png);
+      fs.writeFile(filePath, buffer, (err) => {
+          if (err) reject(err);
+          else resolve();
+      });
+  });
+}
 
 // Listen for 'start-capture' from the renderer
 ipcMain.on('start-capture-box', () => {
