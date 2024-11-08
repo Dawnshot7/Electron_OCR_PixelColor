@@ -14,12 +14,14 @@ const Jimp = require('jimp');
 
 let win; // Variable to hold the reference to the main application window
 
-// Define a new state object with nested structures for ocrRegions and pixelCoordinates
+// Define a new state object with nested structures for ocrRegions and pixelCoords
 const state = {
   ocrRegions: {
+    selected: {profile: 'initial', region: 'ocrRegion1'},
     ocrRegion1: { x: 0, y: 300, width: 250, height: 300, invert: false, contrast: 1.0, brightness: 1.0 }
   },
-  pixelCoordinates: {
+  pixelCoords: {
+    selected: {profile: 'initial', region: 'pixelCoord1'},
     pixelCoord1: { x: 50, y: 50, color: "#000000", active: true }
   }
 };
@@ -45,8 +47,8 @@ function createWindow() {
 
   // Set an interval to monitor the pixel color and OCR repeatedly
   setInterval(async () => {
-    // Get the pixel color from state.pixelCoordinates.pixelCoord1
-    const { x, y } = state.pixelCoordinates.pixelCoord1;
+    // Get the pixel color from state.pixelCoords.pixelCoord1
+    const { x, y } = state.pixelCoords.pixelCoord1;
     const color = robot.getPixelColor(x, y);
 
     // Perform OCR using state.ocrRegions.ocrRegion1
@@ -145,7 +147,7 @@ ipcMain.on('start-capture-box', () => {
   });
 });
 
-// Listen for 'start-capture' from the renderer and update state.pixelCoordinates.pixelCoord1
+// Listen for 'start-capture' from the renderer and update state.pixelCoords.pixelCoord1
 ipcMain.on('start-capture-pixel', () => {
   const ahkPath = path.join(__dirname, '../scripts/AutoHotkeyA32.exe');
   const ahkScript = path.join(__dirname, '../scripts/getPixelCoords.ahk');
@@ -158,8 +160,8 @@ ipcMain.on('start-capture-pixel', () => {
       const [x1, y1] = output.split(" ").map(Number);
       console.log(`Setting Pixel to: (${x1}, ${y1})`);
 
-      // Update state.pixelCoordinates.pixelCoord1
-      state.pixelCoordinates.pixelCoord1 = {
+      // Update state.pixelCoords.pixelCoord1
+      state.pixelCoords.pixelCoord1 = {
         x: x1,
         y: y1,
         color: robot.getPixelColor(x1, y1),
@@ -178,3 +180,29 @@ ipcMain.on('start-capture-pixel', () => {
     console.log(`AHK process exited with code ${code}`);
   });
 });
+
+// Add the new ipcMain listener for variable updates
+ipcMain.on('update-variable', (event, { variableName, key, value }) => {
+  try {
+    if (!state[variableName]) {
+      console.error(`Key ${variableName} not found in state`);
+    } else if (!state[variableName][key]) {
+      console.error(`Key ${key} not found in ${variableName}`);
+    } else {
+      // Update the pixel coordinates entry by key
+      state[variableName][key] = { ...state[variableName][key], ...value };
+      console.log(`Updated state[${variableName}][${key}]:`, state[variableName][key]);
+    }
+    if (key === 'selected') {
+      const selectedValues = state[variableName][value.region];
+      win.webContents.send('updateVariables', { selectedValues });
+    }
+    if (key === 'component') {
+      const selectedValues = state[variableName][value.region];
+      win.webContents.send('updateVariables', { selectedValues });
+    }
+  } catch (error) {
+    console.error('Error updating variable:', error);
+  }
+});
+

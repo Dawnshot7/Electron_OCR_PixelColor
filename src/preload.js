@@ -7,5 +7,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPixelColor: (callback) => ipcRenderer.on('pixelColor', callback),
   onOCRText: (callback) => ipcRenderer.on('ocrText', callback),
   startCapturePixel: () => ipcRenderer.send('start-capture-pixel'),
-  startCaptureBox: () => ipcRenderer.send('start-capture-box')
+  startCaptureBox: () => ipcRenderer.send('start-capture-box'),
+
+  onUpdateVariables: (callback) => ipcRenderer.on('updateVariables', callback),
+  // Add method to update variable in main process
+  updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value }),
 });
