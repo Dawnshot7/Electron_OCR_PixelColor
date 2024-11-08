@@ -17,6 +17,9 @@ let win; // Variable to hold the reference to the main application window
 // Define a variable to store the OCR region
 let ocrRegion = { x: 0, y: 300, width: 250, height: 300 };  // Default OCR region
 
+// Define a variable to store the Pixel coordinate
+let pixelCoord = { x: 50, y: 50 };  // Default OCR region
+
 /**
  * Function to create the main application window.
  * Initializes the window and sets up its properties.
@@ -37,8 +40,8 @@ function createWindow() {
 
   // Set an interval to monitor the pixel color and OCR every 3 seconds
   setInterval(async () => {
-    const { x, y } = { x: 50, y: 240 }; // Coordinates of the pixel to monitor (modifiable)
-    const color = robot.getPixelColor(x, y); // Get the pixel color at the specified coordinates
+    const { x, y } = { x: pixelCoord.x, y: pixelCoord.y }; // Coordinates of the pixel to monitor (modifiable)
+    const color = robot.getPixelColor(pixelCoord.x, pixelCoord.y); // Get the pixel color at the specified coordinates
 
     // Perform OCR and capture text in the specified region
     const ocrText = await captureAndRecognize();
@@ -46,7 +49,8 @@ function createWindow() {
     //console.log(`Color at (100, 100): ${color}`);
 
     // Send the pixel color and OCR data to the renderer process via IPC
-    win.webContents.send('pixelColor', { x, y, color, ocrText }); // Sending both pixel and OCR data
+    win.webContents.send('pixelColor', { x, y, color }); // Sending both pixel and OCR data
+    win.webContents.send('ocrText', { ocrText }); // Sending both pixel and OCR data
   }, 1000); // Interval set to 3000 milliseconds (3 seconds)
 }
 
@@ -106,7 +110,7 @@ app.on('window-all-closed', () => {
 });
 
 // Listen for 'start-capture' from the renderer
-ipcMain.on('start-capture', () => {
+ipcMain.on('start-capture-box', () => {
   // Path to AutoHotkey executable and script
   const ahkPath = path.join(__dirname, '../scripts/AutoHotkeyA32.exe');
   const ahkScript = path.join(__dirname, '../scripts/getBoxCoords.ahk');
@@ -127,6 +131,41 @@ ipcMain.on('start-capture', () => {
           y: y1,
           width: Math.abs(x2 - x1),
           height: Math.abs(y2 - y1)
+        };
+      } else {
+        console.log('No coordinates received from AHK script');
+      }
+  });
+
+  ahkProcess.stderr.on('data', (data) => {
+      console.error(`AHK Error: ${data}`);
+  });
+
+  ahkProcess.on('close', (code) => {
+      console.log(`AHK process exited with code ${code}`);
+  });
+});
+
+// Listen for 'start-capture' from the renderer
+ipcMain.on('start-capture-pixel', () => {
+  // Path to AutoHotkey executable and script
+  const ahkPath = path.join(__dirname, '../scripts/AutoHotkeyA32.exe');
+  const ahkScript = path.join(__dirname, '../scripts/getPixelCoords.ahk');
+
+  // Spawn the AHK process
+  const ahkProcess = spawn(ahkPath, [ahkScript]);
+
+  ahkProcess.stdout.on('data', (data) => {
+      // Parse the coordinates from AHK output
+      const output = data.toString().trim();
+      if (output) {
+        const [x1, y1] = output.split(" ").map(Number);
+        console.log(`Setting Pixel to: (${x1}, ${y1})`);
+  
+        // Update OCR region with these coordinates
+        pixelCoord = {
+          x: x1,
+          y: y1,
         };
       } else {
         console.log('No coordinates received from AHK script');
