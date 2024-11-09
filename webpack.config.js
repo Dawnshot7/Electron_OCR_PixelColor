@@ -1,4 +1,3 @@
-// webpack.config.js
 const { VueLoaderPlugin } = require('vue-loader');
 const path = require('path');
 
@@ -13,7 +12,14 @@ module.exports = {
     rules: [
       {
         test: /\.vue$/,
-        loader: 'vue-loader'
+        loader: 'vue-loader',
+        options: {
+          transformAssetUrls: {
+            img: 'src', // Ensures `img` tags resolve `src` paths
+            image: 'xlink:href', // For SVG images
+            // Add more here if using custom tags that have `src` attributes
+          }
+        }  
       },
       {
         test: /\.js$/,
@@ -24,7 +30,14 @@ module.exports = {
       },
       {
         test: /\.css$/,
-        use: ['vue-style-loader', 'css-loader']  // Add CSS loaders here
+        use: ['vue-style-loader', 'css-loader']
+      },
+      {
+        test: /\.(png|jpe?g|gif|svg)$/i,
+        type: 'asset/resource', // Handles the image files
+        generator: {
+          filename: 'assets/images/[name][ext][query]' // Customize your output directory
+        }
       }
     ]
   },
@@ -33,7 +46,8 @@ module.exports = {
   ],
   resolve: {
     alias: {
-      vue$: 'vue/dist/vue.esm-bundler.js'
+      vue$: 'vue/dist/vue.esm-bundler.js',
+      '@': path.resolve(__dirname, 'src') // This allows use of '@/assets/...'
     },
     extensions: ['*', '.js', '.vue', '.json']
   }

@@ -25,10 +25,10 @@
 
           <!-- Images Side by Side -->
           <b-col cols="4" md="4">
-            <img :src="ocrImages.unmodified" alt="Unmodified Image" class="img-fluid" />
+            <b-img :src="unmodifiedImageSrc" alt="Unmodified Image" :key="timestamp" class="img-fluid" ></b-img>
           </b-col>
           <b-col cols="4" md="4">
-            <img :src="ocrImages.modified" alt="Modified Image" class="img-fluid" />
+            <b-img :src="modifiedImageSrc" alt="Modified Image" :key="timestamp" class="img-fluid" ></b-img>
           </b-col>
 
           <!-- OCR Text -->
@@ -135,7 +135,7 @@
 
           <!-- Placeholder column for other options -->
           <b-col cols="4" md="4">
-            <img :src="unmodifiedImageSrc" alt="other options" class="img-fluid" />
+            <img :src="ghjc" alt="other options" class="img-fluid" />
           </b-col>
         </b-row>
       </b-col>
@@ -147,6 +147,9 @@
 export default {
   data() {
     return {
+      unmodifiedImageSrc: require('@/assets/unmodifiedImage.png'),
+      modifiedImageSrc: require('@/assets/modifiedImage.png'),
+      timestamp: Date.now(),
       ocrList: {
         regions: ['ocrRegion1', 'ocrRegion2'],
         regionSelected: 'ocrRegion1',
@@ -162,8 +165,10 @@ export default {
         brightness: 0.5,
       },
       ocrImages: {
-        unmodified: '', // Placeholder for unmodified image src
-        modified: '',   // Placeholder for modified image src
+        unmodifiedImageSrc: require('@/assets/unmodifiedImage.png'),
+        modifiedImageSrc: require('@/assets/modifiedImage.png'),
+        refreshInterval: 1000, // Set refresh interval to 1 second
+        timestamp: Date.now()  // Start with current timestamp
       }
     };
   },
@@ -183,8 +188,33 @@ export default {
       window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { contrast: this.ocrConfig.contrast });
     },
     regionChange(newSelection) {
-      this.ocrList.regionSelected = newSelection
+      this.ocrList.regionSelected = newSelection;
       window.electronAPI.updateVariable('ocrRegions', 'selected', { region: newSelection });
+    },
+    updateImages() {
+      const timestamp = Date.now();  // Generate new timestamp each time
+      this.unmodifiedImageSrc = require(`@/assets/unmodifiedImage2.png?timestamp=${timestamp}`);
+      this.modifiedImageSrc = require(`@/assets/modifiedImage2.png?timestamp=${timestamp}`);
+      this.timestamp = timestamp;  // Update timestamp to force reactivity
+    },
+    startImageRefresh() {
+      // Clear any existing interval before starting a new one
+      if (this.imageRefreshInterval) {
+        clearInterval(this.imageRefreshInterval);
+      }
+      this.imageRefreshInterval = setInterval(() => {
+        this.updateImages();
+      }, this.ocrImages.refreshInterval);
+    }
+  },
+  created() {
+    console.log('Component created');
+    this.startImageRefresh();  // Start the image refresh interval when the component is created
+  },
+  beforeDestroy() {
+    // Clean up the interval when the component is destroyed to avoid memory leaks
+    if (this.imageRefreshInterval) {
+      clearInterval(this.imageRefreshInterval);
     }
   },
   mounted() {
@@ -212,8 +242,9 @@ export default {
         // Populate fields from selectedValues
         this.ocrList = { ...selectedValues };
       }
-    });
+    });    
   }
+  
 };
 </script>
 
