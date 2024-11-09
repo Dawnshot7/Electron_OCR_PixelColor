@@ -62,7 +62,7 @@ function createWindow() {
 
     // Send the pixel color and OCR data to the renderer process via IPC
     win.webContents.send('pixelColor', { x, y, color }); // Sending pixel data
-    win.webContents.send('ocrText', { ocrText }); // Sending OCR data
+    //win.webContents.send('ocrText', { ocrText }); // Sending OCR data
   }, 1000); // Interval set to 1000 milliseconds 
 }
 
@@ -246,7 +246,7 @@ ipcMain.on('start-capture-pixel', () => {
 });
 
 // Add the new ipcMain listener for variable updates
-ipcMain.on('update-variable', (event, { variableName, key, value }) => {
+ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
   try {
     if (!state[variableName]) {
       console.error(`Key ${variableName} not found in state`);
@@ -256,6 +256,21 @@ ipcMain.on('update-variable', (event, { variableName, key, value }) => {
       // Update the pixel coordinates entry by key
       state[variableName][key] = { ...state[variableName][key], ...value };
       console.log(`Updated state[${variableName}][${key}]:`, state[variableName][key]);
+      if (variableName === 'ocrRegions') {
+        await processAndSaveModifiedImage(unmodifiedImagePath, modifiedImagePath, state[variableName][key]);
+        console.log('Image processed and saved successfully');
+
+        await fs.readFile('src/assets/unmodifiedImage.png', (err, data) => {
+          win.webContents.send('updateUnmodifiedImage', data);
+          console.log('sent unmodified image');
+        });  
+        await fs.readFile('src/assets/modifiedImage.png', (err, data) => {
+          win.webContents.send('updateModifiedImage', data);
+          console.log('sent modified image');
+        });  
+        const ocrText = await recognizeTextFromImage(modifiedImagePath);
+        win.webContents.send('ocrText', { ocrText });
+      }
     }
     if (key === 'selected' ) {
       const selectedRegion = state[variableName].selected.region;
