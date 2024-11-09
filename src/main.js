@@ -33,8 +33,8 @@ const state = {
  */
 function createWindow() {
   win = new BrowserWindow({
-    width: 1600,
-    height: 1200,
+    width: 1200,
+    height: 800,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true, // Important for enabling IPC usage
