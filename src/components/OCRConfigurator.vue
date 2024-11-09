@@ -95,7 +95,7 @@
             <!-- Invert Checkbox -->
             <b-row class="mt-3">
               <div class="d-flex justify-content-center">
-                <b-form-checkbox v-model="ocrConfig.invert">Invert image</b-form-checkbox>
+                <b-form-checkbox v-model="ocrConfig.invert" @change="toggleInvert">Invert image</b-form-checkbox>
               </div>
             </b-row>
 
@@ -119,14 +119,14 @@
             <b-row class="mt-3">
               <b-form-group label="Contrast" label-align="center" label-for="contrast">
                 <div class="d-flex justify-content-center">
-                  <b-button @click="adjustContrast(+0.1)" variant="outline-secondary">+</b-button>
+                  <b-button @click="adjustContrast(-0.1)" variant="outline-secondary">-</b-button>
                   <b-form-input
                     v-model="ocrConfig.contrast"
                     type="number"
                     class="fixed-width-input"
                     readonly
                   ></b-form-input>
-                  <b-button @click="adjustContrast(-0.1)" variant="outline-secondary">-</b-button>
+                  <b-button @click="adjustContrast(0.1)" variant="outline-secondary">+</b-button>
                 </div>
               </b-form-group>
             </b-row>
@@ -171,16 +171,20 @@ export default {
     startCaptureBox() {
       window.electronAPI.startCaptureBox();
     },
+    toggleInvert() {
+      window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { invert: this.ocrConfig.invert });
+    },
     adjustBrightness(delta) {
-      this.ocrRegion.brightness = Math.max(0, this.ocrRegion.brightness + delta);
+      this.ocrConfig.brightness = Math.min(1, Math.max(0, parseFloat((this.ocrConfig.brightness + delta).toFixed(1))));
       window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { brightness: this.ocrConfig.brightness });
     },
     adjustContrast(delta) {
-      this.ocrRegion.contrast = Math.max(0, this.ocrRegion.contrast + delta);
-      window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { contrast: this.ocrRegion.contrast });
+      this.ocrConfig.contrast = Math.min(1, Math.max(0, parseFloat((this.ocrConfig.contrast + delta).toFixed(1))));
+      window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { contrast: this.ocrConfig.contrast });
     },
     regionChange(newSelection) {
-      window.electronAPI.updateVariable('ocrRegions', 'selected', { region: {newSelection} });
+      this.ocrList.regionSelected = newSelection
+      window.electronAPI.updateVariable('ocrRegions', 'selected', { region: newSelection });
     }
   },
   mounted() {
@@ -208,11 +212,6 @@ export default {
         // Populate fields from selectedValues
         this.ocrList = { ...selectedValues };
       }
-    });
-
-    // IPC listener for image updates
-    window.electronAPI.onupdateImages(({ unmodified, modified }) => {
-      this.ocrImages = { unmodified, modified };
     });
   }
 };

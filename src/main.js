@@ -18,7 +18,8 @@ let win; // Variable to hold the reference to the main application window
 const state = {
   ocrRegions: {
     selected: {profile: 'initial', region: 'ocrRegion1'},
-    ocrRegion1: { x: 0, y: 300, width: 250, height: 300, invert: false, contrast: 1.0, brightness: 1.0 }
+    ocrRegion1: { x: 0, y: 300, width: 250, height: 300, invert: false, contrast: 1.0, brightness: 1.0 },
+    ocrRegion2: { x: 500, y: 800, width: 150, height: 200, invert: false, contrast: 0.2, brightness: 0.2 }
   },
   pixelCoords: {
     selected: {profile: 'initial', region: 'pixelCoord1'},
