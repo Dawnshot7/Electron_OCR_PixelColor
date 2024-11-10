@@ -3,8 +3,8 @@
     <h1 class="mb-3">OCR Configurator</h1>
     <b-row>
 
-        <!-- Left Column with Listbox of OCR Regions -->
-        <b-col cols="3" md="3" style="min-width: 200px;">
+      <!-- Left Column with Listbox of OCR Regions -->
+      <b-col cols="3" md="3" style="min-width: 200px;">
         <div class="list-group">
           <button
             v-for="region in ocrList.regions"
@@ -20,7 +20,7 @@
       <!-- All other content in component -->
       <b-col cols="9" md="9">
 
-        <!-- Display unmodified image, modified image and OCR text in a Row -->
+        <!-- Display unmodified image, modified image and OCR text in top Row -->
         <b-row class="align-items-center mb-3">
 
           <!-- Images Side by Side -->
@@ -37,10 +37,10 @@
           </b-col>
         </b-row>
          
-        <!-- OCR Region Configuration Fields in Columns -->
+        <!-- Bottom row with OCR Configuration Fields in Columns -->
         <b-row>
 
-          <!-- Region name, position, save, delete and new region buttons -->
+          <!-- Left column with box position, capture coords, show overlay, rename, new region, delete region -->
           <b-col cols="4" md="4">
 
             <!-- Position Fields -->
@@ -87,9 +87,14 @@
                 <b-button @click="startCaptureBox">Start Coordinate Capture</b-button>
               </b-col>
             </b-row>
+
+            <!-- Button to show current ocr box on overlay -->
+            <!-- Edit box to change region name  -->
+            <!-- Button to create a new region with default settings -->
+            <!-- Button to delete current region from the list -->
           </b-col>
 
-           <!-- Image modification fields -->
+           <!-- Middle column with image modification fields (Invert, brightness, contrast) -->
           <b-col cols="4" md="4">
             
             <!-- Invert Checkbox -->
@@ -135,8 +140,12 @@
 
           <!-- Placeholder column for other options -->
           <b-col cols="4" md="4">
-            <img :src="ghjc" alt="other options" class="img-fluid" />
-          </b-col>
+            <!-- Live OCR text checkbox -->
+            <b-row class="mt-3">
+              <div class="d-flex justify-content-center">
+                <b-form-checkbox v-model="ocrList.live" @change="toggleLive">Live OCR text</b-form-checkbox>
+              </div>
+            </b-row>          </b-col>
         </b-row>
       </b-col>
     </b-row>
@@ -148,8 +157,10 @@ export default {
   data() {
     return {
       ocrList: {
+        profile: 'initial',
         regions: ['ocrRegion1', 'ocrRegion2'],
         regionSelected: 'ocrRegion1',
+        live: false
       },
       ocrText: 'Start OCR',
       ocrConfig: {
@@ -159,7 +170,7 @@ export default {
         height: 200,
         invert: false,
         contrast: 0.5,
-        brightness: 0.5,
+        brightness: 0.5
       },
     };
   },
@@ -180,41 +191,43 @@ export default {
     },
     regionChange(newSelection) {
       this.ocrList.regionSelected = newSelection;
-      window.electronAPI.updateVariable('ocrRegions', 'selected', { region: newSelection });
+      window.electronAPI.updateVariable('ocrRegions', 'selected', { regionSelected: newSelection });
+    },
+    toggleLive() {
+      window.electronAPI.updateVariable('ocrRegions', 'selected', { live: this.ocrList.live });
     }
   },
   mounted() {
-    // Trigger initial selection update on component load
+    // Trigger initial selection update on component load and set live ocr to false
     window.electronAPI.updateVariable('ocrRegions', 'selected', {});
 
     // Handle OCR text event from Electron
     window.electronAPI.onOCRText((event, ocrData) => {
       const { ocrText } = ocrData;
-      this.ocrText = `Text in box: ${ocrText || 'No text found'}`;
+      this.ocrText = `${ocrText || 'No text found'}`;
     });
 
     // Listen for variable updates to populate the form fields
     window.electronAPI.onupdateConfig(({ selectedValues }) => {
       if (selectedValues) {
         // Populate fields from selectedValues
-        Object.assign(this.ocrConfig, selectedValues);
-        this.ocrText = 'got data'
+        this.ocrConfig = { ...this.ocrConfig, ...selectedValues };
       }
     });
 
-    // Listen for sent images
+    // Listen for sent unmodified image
     window.electronAPI.onupdateUnmodifiedImage(({ buffer }) => {
       const blob = new Blob([buffer], { type: 'image/png' });
       document.getElementById('unmodifiedImage').src = URL.createObjectURL(blob);
     }); 
     
-    // Listen for sent images
+    // Listen for sent modified image
     window.electronAPI.onupdateModifiedImage(({ buffer }) => {
       const blob = new Blob([buffer], { type: 'image/png' });
       document.getElementById('modifiedImage').src = URL.createObjectURL(blob);
     }); 
     
-    // Listen for variable updates to populate the list box
+    // Listen for updates to populate the list box on component load
     window.electronAPI.onupdateList(({ selectedValues }) => {
       if (selectedValues) {
         // Populate fields from selectedValues

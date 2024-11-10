@@ -17,7 +17,7 @@ let win; // Variable to hold the reference to the main application window
 // Define a new state object with nested structures for ocrRegions and pixelCoords
 const state = {
   ocrRegions: {
-    selected: {profile: 'initial', region: 'ocrRegion1'},
+    selected: {profile: 'initial', regionSelected: 'ocrRegion1', live: 'false', regions: ['ocrRegion1', 'ocrRegion2']},
     ocrRegion1: { x: 0, y: 300, width: 250, height: 300, invert: false, contrast: 0.6, brightness: 0.5 },
     ocrRegion2: { x: 500, y: 800, width: 150, height: 200, invert: false, contrast: 0.2, brightness: 0.2 }
   },
@@ -58,7 +58,7 @@ function createWindow() {
 
     // Perform OCR using state.ocrRegions.ocrRegion1
     //const ocrText = await captureAndRecognize(state.ocrRegions.ocrRegion1);
-    const ocrText = await captureAndProcessScreenshot(state.ocrRegions.ocrRegion1);
+    //const ocrText = await captureAndProcessScreenshot(state.ocrRegions.ocrRegion1);
 
     // Send the pixel color and OCR data to the renderer process via IPC
     win.webContents.send('pixelColor', { x, y, color }); // Sending pixel data
@@ -190,13 +190,15 @@ ipcMain.on('start-capture-box', () => {
       const [x1, y1, x2, y2] = output.split(" ").map(Number);
       console.log(`Setting OCR region to: (${x1}, ${y1}) to (${x2}, ${y2})`);
 
-      // Update state.ocrRegions.ocrRegion1
-      state.ocrRegions.ocrRegion1 = {
+      // Update coordinates for .regionSelected
+      const thisRegion = state['ocrRegions']['selected'].regionSelected
+      const thisData = {
         x: x1,
         y: y1,
         width: Math.abs(x2 - x1),
         height: Math.abs(y2 - y1)
       };
+      state['ocrRegions'][thisRegion] = { ...state['ocrRegions'][thisRegion], ...thisData };
     } else {
       console.log('No coordinates received from AHK script');
     }
@@ -256,27 +258,36 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       // Update the pixel coordinates entry by key
       state[variableName][key] = { ...state[variableName][key], ...value };
       console.log(`Updated state[${variableName}][${key}]:`, state[variableName][key]);
+      
       if (variableName === 'ocrRegions') {
-        await processAndSaveModifiedImage(unmodifiedImagePath, modifiedImagePath, state[variableName][key]);
+        region = state['ocrRegions']['selected'].regionSelected
+        // Process and save the modified image
+        //await processAndSaveModifiedImage(unmodifiedImagePath, modifiedImagePath, state[variableName][region]);
+       
+        // Perform OCR and send the recognized text
+        const ocrText = await captureAndProcessScreenshot(state[variableName][region]);
+        win.webContents.send('ocrText', { ocrText });
         console.log('Image processed and saved successfully');
 
-        await fs.readFile('src/assets/unmodifiedImage.png', (err, data) => {
-          win.webContents.send('updateUnmodifiedImage', data);
-          console.log('sent unmodified image');
-        });  
-        await fs.readFile('src/assets/modifiedImage.png', (err, data) => {
-          win.webContents.send('updateModifiedImage', data);
-          console.log('sent modified image');
-        });  
-        const ocrText = await recognizeTextFromImage(modifiedImagePath);
-        win.webContents.send('ocrText', { ocrText });
+        // Read and send the unmodified image
+        const unmodifiedImageData = fs.readFileSync('src/assets/unmodifiedImage.png');
+        win.webContents.send('updateUnmodifiedImage', unmodifiedImageData);
+        console.log('Sent unmodified image');
+
+        // Read and send the modified image
+        const modifiedImageData = fs.readFileSync('src/assets/modifiedImage.png');
+        win.webContents.send('updateModifiedImage', modifiedImageData);
+        console.log('Sent modified image'); 
       }
     }
     if (key === 'selected' ) {
-      const selectedRegion = state[variableName].selected.region;
+      const selectedRegion = state[variableName].selected.regionSelected;
       const selectedValues = state[variableName][selectedRegion];
+      const selectedList = state[variableName]['selected'];
       win.webContents.send('updateConfig', { selectedValues });
-      console.log(`Main replied: ${selectedValues}`);
+      win.webContents.send('updateList', { selectedList } );
+
+      console.log(`Main replied: `, state[variableName][selectedRegion]);
     }
   } catch (error) {
     console.error('Error updating variable:', error);
