@@ -6,20 +6,42 @@
       <!-- Left Column with Listbox of OCR Regions -->
       <b-col cols="3" md="3" style="min-width: 200px;">
         <div class="list-group">
+          <!-- Render active OCR region buttons -->
           <button
             v-for="region in ocrList.regions"
             :key="region"
             @click="regionChange(region)"
-            :class="['list-group-item', { active: region === ocrList.regionSelected }]"
+            :class="['list-group-item', { active: region === ocrList.regionSelected }, 'text-center', 'ocr-btn']"
           >
             {{ region }}
+          </button>
+
+          <!-- Render the "Add Region" button in the next available slot -->
+          <button
+            v-if="ocrList.regions.length < 15"
+            @click="addRegion()"
+            class="list-group-item list-group-item-action text-center add-region-btn bg-light"
+            style="background-color: #797979;"
+          >
+            Add Region
+          </button>
+
+          <!-- Render "empty" placeholders for remaining slots up to 15 -->
+          <button
+            v-for="index in 15 - ocrList.regions.length - 1"
+            :key="'empty-' + index"
+            class="list-group-item text-center empty-btn"
+            style="background-color: #d3d3d3;"
+            disabled
+          >
+            Empty
           </button>
         </div>
       </b-col>
 
-      <!-- All other content in component -->
-      <b-col cols="9" md="9">
 
+      <!-- All other content in component -->
+      <b-col cols="9" md="9" class="image-region">
         <!-- Display unmodified image, modified image and OCR text in top Row -->
         <b-row class="align-items-center mb-3">
 
@@ -193,6 +215,12 @@ export default {
       this.ocrList.regionSelected = newSelection;
       window.electronAPI.updateVariable('ocrRegions', 'selected', { regionSelected: newSelection });
     },
+    addRegion() {
+      const newRegion = `ocrRegion${this.ocrList.regions.length + 1}`;
+      // Add a new OCR region to the list and switch to it
+      this.ocrList.regions.push(newRegion);
+      this.regionChange(newRegion);
+    },
     toggleLive() {
       window.electronAPI.updateVariable('ocrRegions', 'selected', { live: this.ocrList.live });
     }
@@ -212,30 +240,28 @@ export default {
       if (selectedValues) {
         // Populate fields from selectedValues
         this.ocrConfig = { ...this.ocrConfig, ...selectedValues };
+        console.log('received config');
       }
     });
 
-    // Listen for sent unmodified image
-    window.electronAPI.onupdateUnmodifiedImage(({ buffer }) => {
-      const blob = new Blob([buffer], { type: 'image/png' });
-      document.getElementById('unmodifiedImage').src = URL.createObjectURL(blob);
-    }); 
-    
-    // Listen for sent modified image
-    window.electronAPI.onupdateModifiedImage(({ buffer }) => {
-      const blob = new Blob([buffer], { type: 'image/png' });
-      document.getElementById('modifiedImage').src = URL.createObjectURL(blob);
-    }); 
-    
     // Listen for updates to populate the list box on component load
-    window.electronAPI.onupdateList(({ selectedValues }) => {
-      if (selectedValues) {
+    window.electronAPI.onupdateList(({ selectedList }) => {
+      if (selectedList) {
         // Populate fields from selectedValues
-        this.ocrList = { ...selectedValues };
+        this.ocrList = { ...this.ocrList, ...selectedList };
+        console.log('received list');
       }
     }); 
+
+    // Listen for the combined images message
+    window.electronAPI.onupdateImages(({ unmodifiedImageData, modifiedImageData }) => {
+      const unmodifiedBlob = new Blob([unmodifiedImageData], { type: 'image/png' });
+      document.getElementById('unmodifiedImage').src = URL.createObjectURL(unmodifiedBlob);
+
+      const modifiedBlob = new Blob([modifiedImageData], { type: 'image/png' });
+      document.getElementById('modifiedImage').src = URL.createObjectURL(modifiedBlob);
+    });
   }
-  
 };
 </script>
 
@@ -255,8 +281,7 @@ export default {
   height: auto;
 }
 
-.list-group-item.active {
-  background-color: #007bff;
-  color: white;
+.ocr-btn {
+  font-weight: bold; /* Force bold text */
 }
 </style>

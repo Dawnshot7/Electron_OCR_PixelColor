@@ -18,7 +18,8 @@ let win; // Variable to hold the reference to the main application window
 const state = {
   ocrRegions: {
     selected: {profile: 'initial', regionSelected: 'ocrRegion1', live: 'false', regions: ['ocrRegion1', 'ocrRegion2']},
-    ocrRegion1: { x: 0, y: 300, width: 250, height: 300, invert: false, contrast: 0.6, brightness: 0.5 },
+    ocrDefault: { x: 0, y: 200, width: 150, height: 100, invert: false, contrast: 0.5, brightness: 0.5 },
+    ocrRegion1: { x: 0, y: 300, width: 250, height: 300, invert: false, contrast: 0.7, brightness: 0.3 },
     ocrRegion2: { x: 500, y: 800, width: 150, height: 200, invert: false, contrast: 0.2, brightness: 0.2 }
   },
   pixelCoords: {
@@ -118,10 +119,10 @@ async function processAndSaveModifiedImage(inputPath, outputPath, { brightness, 
     if (invert) image.invert();
     image.brightness((brightness*2) - 1); // Adjust brightness (Jimp uses -1 to 1 scale)
     image.contrast((contrast*2)-1); // Adjust contrast
-
+    image.resize(image.bitmap.width * 3, image.bitmap.height * 3, Jimp.RESIZE_BICUBIC);
+    image.greyscale();
     // Save the modified image
     await image.writeAsync(outputPath);
-    //console.log(`Modified image saved to ${outputPath}`);
   } catch (error) {
     console.error('Error processing and saving modified image:', error);
   }
@@ -143,39 +144,6 @@ function recognizeTextFromImage(imagePath) {
     resolve(text); // Resolve with the recognized text
   });
 }
-/*
-// Function to capture a specific area of the screen and recognize text
-async function captureAndRecognize(ocrRegion) {
-  // Capture the screen based on the passed ocrRegion
-  const screenshot = robot.screen.capture(ocrRegion.x, ocrRegion.y, ocrRegion.width, ocrRegion.height);
-
-  const tempImagePath = path.join(__dirname, 'assets/tempImage.png');
-  // Define paths for the original and modified images
-  
-  try {
-    // Save the screenshot as a PNG
-    await saveScreenshotAsPNG(screenshot, tempImagePath);
-
-    // Read the saved image and process it
-    const src = fs.readFileSync(tempImagePath); // Read the file synchronously
-    const img = new Image();
-    img.src = src;
-    const canvas = createCanvas(img.width, img.height);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, img.width, img.height);
-
-    // Process the image with OCRAD
-    const text = OCRAD(canvas);  // OCRAD will process the canvas directly
-    return text.trim(); // Return the recognized text
-  } catch (error) {
-    console.error('Error during OCR recognition:', error);
-    return ''; // Return empty string in case of error
-  } finally {
-    // Clean up the temporary image file
-    fs.unlinkSync(tempImagePath);
-  }
-}
-*/
 
 // Listen for 'start-capture' from the renderer and update state.ocrRegions.ocrRegion1
 ipcMain.on('start-capture-box', () => {
@@ -253,41 +221,44 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
     if (!state[variableName]) {
       console.error(`Key ${variableName} not found in state`);
     } else if (!state[variableName][key]) {
-      console.error(`Key ${key} not found in ${variableName}`);
+      state[variableName][key] = value;
+      console.error(`Key ${key} not found in state[${variableName}]`);
     } else {
-      // Update the pixel coordinates entry by key
+      // Update the variable data key by key
       state[variableName][key] = { ...state[variableName][key], ...value };
       console.log(`Updated state[${variableName}][${key}]:`, state[variableName][key]);
       
       if (variableName === 'ocrRegions') {
         region = state['ocrRegions']['selected'].regionSelected
-        // Process and save the modified image
-        //await processAndSaveModifiedImage(unmodifiedImagePath, modifiedImagePath, state[variableName][region]);
-       
+        // Check if selectedRegion exists in selected.regions; if not, add it
+        if (!state['ocrRegions']['selected'].regions.includes(region)) {
+          // Set default config for the new region
+          state['ocrRegions'][region] = { ...state['ocrRegions']['ocrDefault'] };
+          // Add the region to the regions list
+          state['ocrRegions']['selected'].regions.push(region);
+          console.log(`Added new region: ${region} with default config`, state['ocrRegions']['selected'].regions);
+        }       
+
         // Perform OCR and send the recognized text
         const ocrText = await captureAndProcessScreenshot(state[variableName][region]);
         win.webContents.send('ocrText', { ocrText });
         console.log('Image processed and saved successfully');
 
-        // Read and send the unmodified image
+        // Read and send the images
         const unmodifiedImageData = fs.readFileSync('src/assets/unmodifiedImage.png');
-        win.webContents.send('updateUnmodifiedImage', unmodifiedImageData);
-        console.log('Sent unmodified image');
-
-        // Read and send the modified image
         const modifiedImageData = fs.readFileSync('src/assets/modifiedImage.png');
-        win.webContents.send('updateModifiedImage', modifiedImageData);
-        console.log('Sent modified image'); 
+        win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
+        console.log('Sent both images');
       }
     }
     if (key === 'selected' ) {
+      // Handle region change and component load by sending config and listbox data
       const selectedRegion = state[variableName].selected.regionSelected;
       const selectedValues = state[variableName][selectedRegion];
       const selectedList = state[variableName]['selected'];
+      win.webContents.send('updateList', { selectedList });
       win.webContents.send('updateConfig', { selectedValues });
-      win.webContents.send('updateList', { selectedList } );
-
-      console.log(`Main replied: `, state[variableName][selectedRegion]);
+      console.log(`Main replied: `, selectedList);
     }
   } catch (error) {
     console.error('Error updating variable:', error);

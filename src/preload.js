@@ -11,7 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   onupdateConfig: (callback) => ipcRenderer.on('updateConfig', (event, data) => callback(data)),
   onupdateList: (callback) => ipcRenderer.on('updateList', (event, data) => callback(data)),
-  onupdateModifiedImage: (callback) => ipcRenderer.on('updateModifiedImage', (event, data) => callback(data)),
+  onupdateImages: (callback) => ipcRenderer.on('updateImages', (event, data) => callback(data)),
   onupdateUnmodifiedImage: (callback) => ipcRenderer.on('updateUnmodifiedImage', (event, data) => callback(data)),
   updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value }),
 });
