@@ -9,28 +9,73 @@ const { createCanvas, Image } = require('canvas');
 const { PNG } = require('pngjs'); // Add PNG for handling PNG format
 const { spawn } = require('child_process');
 const Jimp = require('jimp');
+const ini = require('ini');
 
 // Robotjs requires Electron v17.4.11
 
 let win; // Variable to hold the reference to the main application window
+let state = {}; //{ocrRegions: {selected: {}}, pixelCoords: {selected: {}}};
 
-// Define a new state object with nested structures for ocrRegions and pixelCoords
-const state = {
-  ocrRegions: {
-    selected: {profile: 'initial', regionSelected: 'ocrRegion1', live: 'false', regions: ['ocrRegion1', 'ocrRegion2']},
-    ocrDefault: { x: 0, y: 200, width: 150, height: 100, invert: false, contrast: 0.5, brightness: 0.5 },
-    ocrRegion1: { x: 0, y: 300, width: 250, height: 300, invert: false, contrast: 0.7, brightness: 0.3 },
-    ocrRegion2: { x: 500, y: 800, width: 150, height: 200, invert: false, contrast: 0.2, brightness: 0.2 }
-  },
-  pixelCoords: {
-    selected: {profile: 'initial', region: 'pixelCoord1'},
-    pixelCoord1: { x: 50, y: 50, color: "#000000", active: true }
+function loadConfig(filePath) {
+  const rawConfig = fs.readFileSync(filePath, 'utf-8');
+  state = ini.parse(rawConfig);
+  console.log(state);
+
+  // Process each key in ocrRegions and convert it into an actual object
+  for (let key in state.ocrRegions) {
+    if (state.ocrRegions.hasOwnProperty(key)) {
+      const stringVar = state.ocrRegions[key];
+      
+      // Use eval() to convert the string to an object
+      try {
+        state.ocrRegions[key] = eval(`(${stringVar})`); // Turns string into an object
+      } catch (error) {
+        console.error('Error parsing string to object:', error);
+      }
+    }
   }
-};
+  for (let key in state.pixelCoords) {
+    if (state.pixelCoords.hasOwnProperty(key)) {
+      const stringVar = state.pixelCoords[key];
+      
+      // Use eval() to convert the string to an object
+      try {
+        state.pixelCoords[key] = eval(`(${stringVar})`); // Turns string into an object
+      } catch (error) {
+        console.error('Error parsing string to object:', error);
+      }
+    }
+  }
+}
+
+function saveConfig(filePath) {
+  // Initialize an empty config object for writing
+  let configForIni = {};
+
+  // Loop through each section in the state (ocrRegions and pixelCoords)
+  for (let section in state) {
+    if (state.hasOwnProperty(section)) {
+      configForIni[section] = {};  // Create the section
+
+      // Iterate through each key-value pair in the section
+      for (let key in state[section]) {
+        if (state[section].hasOwnProperty(key)) {
+          // Convert each value to a JSON string for storage in ini format
+          configForIni[section][key] = JSON.stringify(state[section][key]);
+        }
+      }
+    }
+  }
+
+  // Use `ini.stringify` to format `configForIni` into ini format
+  const iniString = ini.stringify(configForIni);
+
+  // Write the formatted ini string to the specified file
+  fs.writeFileSync(filePath, iniString, 'utf-8');
+}
 
 const unmodifiedImagePath = path.join(__dirname, 'assets/unmodifiedImage.png');
 const modifiedImagePath = path.join(__dirname, 'assets/modifiedImage.png');
-
 
 /**
  * Function to create the main application window.
@@ -54,21 +99,27 @@ function createWindow() {
   // Set an interval to monitor the pixel color and OCR repeatedly
   setInterval(async () => {
     // Get the pixel color from state.pixelCoords.pixelCoord1
-    const { x, y } = state.pixelCoords.pixelCoord1;
-    const color = robot.getPixelColor(x, y);
+    //const { x, y } = state.pixelCoords.pixelCoord1;
+    //const color = robot.getPixelColor(x, y);
 
     // Perform OCR using state.ocrRegions.ocrRegion1
     //const ocrText = await captureAndRecognize(state.ocrRegions.ocrRegion1);
     //const ocrText = await captureAndProcessScreenshot(state.ocrRegions.ocrRegion1);
 
     // Send the pixel color and OCR data to the renderer process via IPC
-    win.webContents.send('pixelColor', { x, y, color }); // Sending pixel data
+    //win.webContents.send('pixelColor', { x, y, color }); // Sending pixel data
     //win.webContents.send('ocrText', { ocrText }); // Sending OCR data
   }, 1000); // Interval set to 1000 milliseconds 
 }
 
 // Event listener for when the application is ready
-app.on('ready', createWindow);
+app.on('ready', () => {
+  // Load config before creating the window
+  loadConfig('src/config/config.ini');
+  
+  // Now create the window after config is loaded
+  createWindow();
+});
 
 // Quit the app when all windows are closed, unless on macOS
 app.on('window-all-closed', () => {
@@ -260,6 +311,7 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       win.webContents.send('updateConfig', { selectedValues });
       console.log(`Main replied: `, selectedList);
     }
+    saveConfig('src/config/config.ini');
   } catch (error) {
     console.error('Error updating variable:', error);
   }
