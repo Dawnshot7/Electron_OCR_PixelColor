@@ -16,6 +16,20 @@ const ini = require('ini');
 let win; // Variable to hold the reference to the main application window
 let state = {}; //{ocrRegions: {selected: {}}, pixelCoords: {selected: {}}};
 
+// Event listener for when the application is ready
+app.on('ready', () => {
+  // Load config before creating the window
+  loadConfig('src/config/config.ini');
+  
+  // Now create the window after config is loaded
+  createWindow();
+});
+
+// Quit the app when all windows are closed, unless on macOS
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+
 function loadConfig(filePath) {
   const rawConfig = fs.readFileSync(filePath, 'utf-8');
   state = ini.parse(rawConfig);
@@ -98,33 +112,23 @@ function createWindow() {
 
   // Set an interval to monitor the pixel color and OCR repeatedly
   setInterval(async () => {
+
     // Get the pixel color from state.pixelCoords.pixelCoord1
-    //const { x, y } = state.pixelCoords.pixelCoord1;
-    //const color = robot.getPixelColor(x, y);
-
-    // Perform OCR using state.ocrRegions.ocrRegion1
-    //const ocrText = await captureAndRecognize(state.ocrRegions.ocrRegion1);
-    //const ocrText = await captureAndProcessScreenshot(state.ocrRegions.ocrRegion1);
-
-    // Send the pixel color and OCR data to the renderer process via IPC
-    //win.webContents.send('pixelColor', { x, y, color }); // Sending pixel data
-    //win.webContents.send('ocrText', { ocrText }); // Sending OCR data
+    if (state['pixelCoords']['selected'].live) {
+      const selectedRegion = state['pixelCoords']['selected'].regionSelected
+      const selectedX = state['pixelCoords'][selectedRegion].x
+      const selectedY = state['pixelCoords'][selectedRegion].y
+      const color = robot.getPixelColor(selectedX, selectedY);
+      win.webContents.send('pixelColor', { selectedX, selectedY, color }); // Sending pixel data
+    }
+    // Perform OCR on selected region
+    if (state['ocrRegions']['selected'].live) {
+      const selectedRegion = state['ocrRegions']['selected'].regionSelected
+      const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][selectedRegion]);
+      win.webContents.send('ocrText', { ocrText }); // Sending OCR data
+    }
   }, 1000); // Interval set to 1000 milliseconds 
 }
-
-// Event listener for when the application is ready
-app.on('ready', () => {
-  // Load config before creating the window
-  loadConfig('src/config/config.ini');
-  
-  // Now create the window after config is loaded
-  createWindow();
-});
-
-// Quit the app when all windows are closed, unless on macOS
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
 
 // Function to capture, save, and process screenshots
 async function captureAndProcessScreenshot(ocrRegion) {
@@ -170,7 +174,7 @@ async function processAndSaveModifiedImage(inputPath, outputPath, { brightness, 
     if (invert) image.invert();
     image.brightness((brightness*2) - 1); // Adjust brightness (Jimp uses -1 to 1 scale)
     image.contrast((contrast*2)-1); // Adjust contrast
-    image.resize(image.bitmap.width * 3, image.bitmap.height * 3, Jimp.RESIZE_BICUBIC);
+    image.resize(image.bitmap.width * 5, image.bitmap.height * 5, Jimp.RESIZE_HERMITE);
     image.greyscale();
     // Save the modified image
     await image.writeAsync(outputPath);
@@ -196,77 +200,73 @@ function recognizeTextFromImage(imagePath) {
   });
 }
 
-// Listen for 'start-capture' from the renderer and update state.ocrRegions.ocrRegion1
-ipcMain.on('start-capture-box', () => {
+// Run Autohotkey scripts to capture user mouse clicks to select coordinates. 
+ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
+  // getBoxCoords.ahk collects two mouse clicks, getPixelCoords.ahk collects one click
   const ahkPath = path.join(__dirname, '../scripts/AutoHotkeyA32.exe');
-  const ahkScript = path.join(__dirname, '../scripts/getBoxCoords.ahk');
+  const ahkScript = path.join(__dirname, `../scripts/${scriptName}.ahk`);
+  const ahkProcess = spawn(ahkPath, [ahkScript, arg1, arg2]);
 
-  const ahkProcess = spawn(ahkPath, [ahkScript]);
-
-  ahkProcess.stdout.on('data', (data) => {
+  // AHK script stdout variable returns mouse click coordinate values
+  ahkProcess.stdout.on('data', async (data) => {
     const output = data.toString().trim();
     if (output) {
-      const [x1, y1, x2, y2] = output.split(" ").map(Number);
-      console.log(`Setting OCR region to: (${x1}, ${y1}) to (${x2}, ${y2})`);
+      if (scriptName === 'getBoxCoords') {
+        // Put stdout into variables
+        const [x1, y1, x2, y2] = output.split(" ").map(Number);
+        console.log(`Setting OCR region to: (${x1}, ${y1}) to (${x2}, ${y2})`);
 
-      // Update coordinates for .regionSelected
-      const thisRegion = state['ocrRegions']['selected'].regionSelected
-      const thisData = {
-        x: x1,
-        y: y1,
-        width: Math.abs(x2 - x1),
-        height: Math.abs(y2 - y1)
-      };
-      state['ocrRegions'][thisRegion] = { ...state['ocrRegions'][thisRegion], ...thisData };
+        // Update coordinates for .regionSelected
+        const thisRegion = state['ocrRegions']['selected'].regionSelected
+        const thisData = {
+          x: x1,
+          y: y1,
+          width: Math.abs(x2 - x1),
+          height: Math.abs(y2 - y1)
+        };
+        state['ocrRegions'][thisRegion] = { ...state['ocrRegions'][thisRegion], ...thisData };
+      
+        // Perform OCR and send the recognized text
+        const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][thisRegion]);
+        win.webContents.send('ocrText', { ocrText });
+        console.log('Image processed and saved successfully');
+    
+        // Read and send the images
+        const unmodifiedImageData = fs.readFileSync('src/assets/unmodifiedImage.png');
+        const modifiedImageData = fs.readFileSync('src/assets/modifiedImage.png');
+        win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
+        console.log('Sent both images'); 
+      } else if (scriptName === 'getPixelCoords'){
+        // Put stdout into variables
+        const [x1, y1] = output.split(" ").map(Number);
+        console.log(`Setting Pixel to: (${x1}, ${y1})`);
+
+        // Update coordinates and desired color for .regionSelected
+        const thisRegion = state['pixelCoords']['selected'].regionSelected
+        thisData = {
+          x: x1,
+          y: y1,
+          color: robot.getPixelColor(x1, y1),
+        };
+        state['pixelCoords'][thisRegion] = { ...state['pixelCoords'][thisRegion], ...thisData };
+      
+        // Send current coords and color of new pixel to be displayed by component
+        win.webContents.send('pixelColor', { x, y, color });
+      }      
+      saveConfig('src/config/config.ini');   
     } else {
       console.log('No coordinates received from AHK script');
     }
   });
-
   ahkProcess.stderr.on('data', (data) => {
     console.error(`AHK Error: ${data}`);
   });
-
   ahkProcess.on('close', (code) => {
     console.log(`AHK process exited with code ${code}`);
   });
 });
 
-// Listen for 'start-capture' from the renderer and update state.pixelCoords.pixelCoord1
-ipcMain.on('start-capture-pixel', () => {
-  const ahkPath = path.join(__dirname, '../scripts/AutoHotkeyA32.exe');
-  const ahkScript = path.join(__dirname, '../scripts/getPixelCoords.ahk');
-
-  const ahkProcess = spawn(ahkPath, [ahkScript]);
-
-  ahkProcess.stdout.on('data', (data) => {
-    const output = data.toString().trim();
-    if (output) {
-      const [x1, y1] = output.split(" ").map(Number);
-      console.log(`Setting Pixel to: (${x1}, ${y1})`);
-
-      // Update state.pixelCoords.pixelCoord1
-      state.pixelCoords.pixelCoord1 = {
-        x: x1,
-        y: y1,
-        color: robot.getPixelColor(x1, y1),
-        active: true
-      };
-    } else {
-      console.log('No coordinates received from AHK script');
-    }
-  });
-
-  ahkProcess.stderr.on('data', (data) => {
-    console.error(`AHK Error: ${data}`);
-  });
-
-  ahkProcess.on('close', (code) => {
-    console.log(`AHK process exited with code ${code}`);
-  });
-});
-
-// Add the new ipcMain listener for variable updates
+// Update the state variable after changes to corresponding variables in the components
 ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
   try {
     if (!state[variableName]) {
@@ -275,13 +275,15 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       state[variableName][key] = value;
       console.error(`Key ${key} not found in state[${variableName}]`);
     } else {
+
       // Update the variable data key by key
       state[variableName][key] = { ...state[variableName][key], ...value };
       console.log(`Updated state[${variableName}][${key}]:`, state[variableName][key]);
       
       if (variableName === 'ocrRegions') {
         region = state['ocrRegions']['selected'].regionSelected
-        // Check if selectedRegion exists in selected.regions; if not, add it
+
+        // Process add new region request 
         if (!state['ocrRegions']['selected'].regions.includes(region)) {
           // Set default config for the new region
           state['ocrRegions'][region] = { ...state['ocrRegions']['ocrDefault'] };
@@ -295,7 +297,7 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
         win.webContents.send('ocrText', { ocrText });
         console.log('Image processed and saved successfully');
 
-        // Read and send the images
+        // Send the updated images
         const unmodifiedImageData = fs.readFileSync('src/assets/unmodifiedImage.png');
         const modifiedImageData = fs.readFileSync('src/assets/modifiedImage.png');
         win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });

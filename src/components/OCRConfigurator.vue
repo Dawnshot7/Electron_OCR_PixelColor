@@ -198,7 +198,7 @@ export default {
   },
   methods: {
     startCaptureBox() {
-      window.electronAPI.startCaptureBox();
+      window.electronAPI.runAhkScript('getBoxCoords', '', '');
     },
     toggleInvert() {
       window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { invert: this.ocrConfig.invert });

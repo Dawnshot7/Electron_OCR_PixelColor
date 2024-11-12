@@ -19,7 +19,7 @@
     methods: {
       startCapturePixel() {
         // Communicate with Electron to start OCR region capture
-        window.electronAPI.startCapturePixel();
+        window.electronAPI.runAhkScript('getPixelCoords', '', '');
       },
     },
     mounted() {
