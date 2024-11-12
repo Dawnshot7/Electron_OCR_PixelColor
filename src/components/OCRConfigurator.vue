@@ -167,7 +167,12 @@
               <div class="d-flex justify-content-center">
                 <b-form-checkbox v-model="ocrList.live" @change="toggleLive">Live OCR text</b-form-checkbox>
               </div>
-            </b-row>          </b-col>
+            </b-row>
+                        <!-- Button to start OCR region capture -->
+            <b-row>
+              <b-button @click="toggleOverlay">Toggle Overlay</b-button>
+            </b-row>
+          </b-col>
         </b-row>
       </b-col>
     </b-row>
@@ -180,11 +185,11 @@ export default {
     return {
       ocrList: {
         profile: 'initial',
-        regions: ['ocrRegion1', 'ocrRegion2'],
-        regionSelected: 'ocrRegion1',
+        regions: ['initial'],
+        regionSelected: 'initial',
         live: false
       },
-      ocrText: 'Start OCR',
+      ocrText: 'initial',
       ocrConfig: {
         x: 0,
         y: 0,
@@ -198,36 +203,47 @@ export default {
   },
   methods: {
     startCaptureBox() {
+      // Runs getBoxCoords.ahk to collect new (x1,y1) and (x2,y2) of the box and save to config.ini
       window.electronAPI.runAhkScript('getBoxCoords', '', '');
     },
     toggleInvert() {
+      // Update config.ini with new invert image variable state 
       window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { invert: this.ocrConfig.invert });
     },
     adjustBrightness(delta) {
+      // Increment or decrement brightness and update config.ini
       this.ocrConfig.brightness = Math.min(1, Math.max(0, parseFloat((this.ocrConfig.brightness + delta).toFixed(1))));
       window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { brightness: this.ocrConfig.brightness });
     },
     adjustContrast(delta) {
+      // Increment or decrement contrast and update config.ini
       this.ocrConfig.contrast = Math.min(1, Math.max(0, parseFloat((this.ocrConfig.contrast + delta).toFixed(1))));
       window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { contrast: this.ocrConfig.contrast });
     },
     regionChange(newSelection) {
+      // Change ocr box being displayed and have main.js send the new box's config data
       this.ocrList.regionSelected = newSelection;
       window.electronAPI.updateVariable('ocrRegions', 'selected', { regionSelected: newSelection });
     },
     addRegion() {
+      // Add a new OCR region to the list 
       const newRegion = `ocrRegion${this.ocrList.regions.length + 1}`;
-      // Add a new OCR region to the list and switch to it
       this.ocrList.regions.push(newRegion);
+      // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
     },
     toggleLive() {
+      // Turns on/off OCR being performed in setinterval in main.js and result sent back every second 
       window.electronAPI.updateVariable('ocrRegions', 'selected', { live: this.ocrList.live });
+    },
+    toggleOverlay() {
+      window.electronAPI.toggleOverlay();
+      console.log('toggled overlay')
     }
   },
   mounted() {
-    // Trigger initial selection update on component load and set live ocr to false
-    window.electronAPI.updateVariable('ocrRegions', 'selected', {});
+    // Trigger main.js to send list, config and images on component load 
+    window.electronAPI.updateVariable('ocrRegions', 'selected', { live: false });
 
     // Handle OCR text event from Electron
     window.electronAPI.onOCRText((event, ocrData) => {

@@ -14,15 +14,17 @@ const ini = require('ini');
 // Robotjs requires Electron v17.4.11
 
 let win; // Variable to hold the reference to the main application window
-let state = {}; //{ocrRegions: {selected: {}}, pixelCoords: {selected: {}}};
+let overlayWindow; // Variable to hold the reference to the transparent alert window
+let state = {}; // Variable to hold all data from config.ini upon loadConfig()
 
 // Event listener for when the application is ready
 app.on('ready', () => {
   // Load config before creating the window
   loadConfig('src/config/config.ini');
   
-  // Now create the window after config is loaded
+  // Now create the windows after their config is loaded
   createWindow();
+  createOverlayWindow();
 });
 
 // Quit the app when all windows are closed, unless on macOS
@@ -30,6 +32,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
+// Read the contents of config.ini into the state variable
 function loadConfig(filePath) {
   const rawConfig = fs.readFileSync(filePath, 'utf-8');
   state = ini.parse(rawConfig);
@@ -60,13 +63,26 @@ function loadConfig(filePath) {
       }
     }
   }
+  for (let key in state.alerts) {
+    if (state.alerts.hasOwnProperty(key)) {
+      const stringVar = state.alerts[key];
+      
+      // Use eval() to convert the string to an object
+      try {
+        state.alerts[key] = eval(`(${stringVar})`); // Turns string into an object
+      } catch (error) {
+        console.error('Error parsing string to object:', error);
+      }
+    }
+  }
 }
 
+// Save the contents of the state variable into config.ini
 function saveConfig(filePath) {
   // Initialize an empty config object for writing
   let configForIni = {};
 
-  // Loop through each section in the state (ocrRegions and pixelCoords)
+  // Loop through each section in the state variable
   for (let section in state) {
     if (state.hasOwnProperty(section)) {
       configForIni[section] = {};  // Create the section
@@ -128,6 +144,37 @@ function createWindow() {
       win.webContents.send('ocrText', { ocrText }); // Sending OCR data
     }
   }, 1000); // Interval set to 1000 milliseconds 
+}
+
+// Create overlay window which will be displayed during gameplay
+function createOverlayWindow() {
+  overlayWindow = new BrowserWindow({
+    fullscreen: true,
+    transparent: true,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    focusable: false, // Prevents the overlay from getting focus
+    hasShadow: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'overlayPreload.js'),
+    }
+  });
+
+  overlayWindow.setIgnoreMouseEvents(true); // Makes it click-through
+  overlayWindow.loadFile('src/renderer/overlay.html'); // Load overlay HTML file
+  overlayWindow.hide(); // Start hidden
+  const alerts=state['alerts']
+  overlayWindow.webContents.on('did-finish-load', () => {
+    overlayWindow.webContents.send('initAlerts', alerts); // Send initial data after loading
+  });
+
+  win.on('close', () => {
+    overlayWindow.close(); // Close the overlay window
+  });
 }
 
 // Function to capture, save, and process screenshots
@@ -278,7 +325,7 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
 
       // Update the variable data key by key
       state[variableName][key] = { ...state[variableName][key], ...value };
-      console.log(`Updated state[${variableName}][${key}]:`, state[variableName][key]);
+      console.log(`Updated state[${variableName}][${key}]:`, value);
       
       if (variableName === 'ocrRegions') {
         region = state['ocrRegions']['selected'].regionSelected
@@ -316,6 +363,17 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
     saveConfig('src/config/config.ini');
   } catch (error) {
     console.error('Error updating variable:', error);
+  }
+});
+
+// IPC listener to toggle overlay visibility
+ipcMain.on('toggle-overlay', (event) => {
+  if (overlayWindow.isVisible()) {
+    overlayWindow.hide();
+  } else {
+    const alerts = state['alerts']
+    overlayWindow.webContents.send('updateAlerts', alerts);
+    overlayWindow.show();
   }
 });
 

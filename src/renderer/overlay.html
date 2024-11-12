@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Overlay</title>
+  <style>
+    body {
+      background: rgba(0, 0, 0, 0); /* Adjust transparency as needed */
+    }
+    .test-box {
+      border: 2px solid white;
+      padding: 20px;
+      background-color: rgba(255, 255, 255, 0);
+    }
+    .alert {
+      position: absolute;
+      border: 2px solid white;
+      padding: 20px;
+      background-color: rgba(255, 255, 255, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="test-box">Overlay is visible</div>
+  <div id="alerts-container"></div> <!-- Container for dynamic alerts -->
+
+  <script>
+    //const { ipcRenderer } = require('electron');
+
+    // Initialize alerts on load
+    window.electronAPI.onInitAlerts(( alerts ) => {
+      console.log('received initAlerts in overlay');
+      renderAlerts(alerts);
+    });
+    window.electronAPI.onUpdateAlerts(( alerts ) => {
+        console.log(`received updateAlerts in overlay`, alerts);
+        renderAlerts(alerts);
+    });
+
+
+    // Function to render alerts based on config
+    function renderAlerts(alertConfig) {
+        // Clear existing alerts
+        const alertsContainer = document.getElementById('alerts-container');
+        alertsContainer.innerHTML = ''; // Clear only alerts, not entire body
+
+        // Iterate over each alert in alertConfig
+        for (const [key, alert] of Object.entries(alertConfig)) {
+            // Only process if alert is an object and has x, y coordinates
+            if (alert && typeof alert === 'object' && 'x' in alert && 'y' in alert) {
+                const alertDiv = document.createElement('div');
+                alertDiv.classList.add('alert');
+                alertDiv.style.left = `${alert.x}px`;
+                alertDiv.style.top = `${alert.y}px`;
+                alertDiv.style.width = `${alert.width}px`;
+                alertDiv.style.height = `${alert.height}px`;
+            
+                // Set content based on type: image or text
+                if (alert.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = alert.src;
+                    img.style.width = '100%';
+                    img.style.height = '100%';
+                    alertDiv.appendChild(img);
+                } else if (alert.type === 'text') {
+                    alertDiv.innerText = alert.content || '';
+                    alertDiv.style.color = alert.color || 'white';
+                }
+
+                alertsContainer.appendChild(alertDiv);
+            }
+        }
+    }    
+  </script>  
+</body>
+</html>

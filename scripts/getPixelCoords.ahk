@@ -1,4 +1,3 @@
-; mouse_capture.ahk
 CoordMode, Mouse, Screen  ; Set coordinates to screen-relative
 
 ; Wait for left mouse button down

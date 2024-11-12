@@ -1,7 +1,6 @@
-; mouse_capture.ahk
 CoordMode, Mouse, Screen  ; Set coordinates to screen-relative
 
-; Wait for left mouse button down
+; Wait for left mouse button down twice
 KeyWait, LButton, D
 MouseGetPos, x1, y1
 KeyWait, LButton, U

@@ -24,7 +24,7 @@
     },
     mounted() {
       // Handle the event when pixel color data is received from the Electron process
-      window.electronAPI.onPixelColor((event, pixelData) => {
+      window.electronAPI.onpixelColor((event, pixelData) => {
         const { x, y, color } = pixelData;
         this.colorInfo = `Color at (${x}, ${y}): ${color}`;
       });

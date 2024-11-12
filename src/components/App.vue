@@ -36,6 +36,7 @@ export default {
     currentTabComponent() {
       return this.currentTab === 'OCRConfigurator' ? OCRConfigurator : PixelSelector;
     },
+
   },
 };
 </script>
