@@ -18,59 +18,119 @@
       padding: 20px;
       background-color: rgba(255, 255, 255, 0.5);
     }
+    /* Style for draggable alerts */
+    .draggable {
+      cursor: move;
+    }
   </style>
 </head>
 <body>
   <div class="test-box">Overlay is visible</div>
+  <button id="turnOffEditMode">Turn Off Edit Mode</button> <!-- Button to toggle edit mode -->
   <div id="alerts-container"></div> <!-- Container for dynamic alerts -->
 
   <script>
-    //const { ipcRenderer } = require('electron');
+    // Track edit mode state
+    let isEditMode = false;
 
     // Initialize alerts on load
-    window.electronAPI.onInitAlerts(( alerts ) => {
+    window.electronAPI.onInitAlerts((alerts) => {
+      isEditMode = false;
       console.log('received initAlerts in overlay');
       renderAlerts(alerts);
     });
-    window.electronAPI.onUpdateAlerts(( alerts ) => {
-        console.log(`received updateAlerts in overlay`, alerts);
-        renderAlerts(alerts);
-    });
 
+    window.electronAPI.onDragAlerts((alerts) => {
+      console.log(`received updateAlerts in overlay`, alerts);
+      isEditMode = true;
+      renderAlerts(alerts);
+    });
 
     // Function to render alerts based on config
     function renderAlerts(alertConfig) {
-        // Clear existing alerts
-        const alertsContainer = document.getElementById('alerts-container');
-        alertsContainer.innerHTML = ''; // Clear only alerts, not entire body
+      const alertsContainer = document.getElementById('alerts-container');
+      alertsContainer.innerHTML = ''; // Clear existing alerts
 
-        // Iterate over each alert in alertConfig
-        for (const [key, alert] of Object.entries(alertConfig)) {
-            // Only process if alert is an object and has x, y coordinates
-            if (alert && typeof alert === 'object' && 'x' in alert && 'y' in alert) {
-                const alertDiv = document.createElement('div');
-                alertDiv.classList.add('alert');
-                alertDiv.style.left = `${alert.x}px`;
-                alertDiv.style.top = `${alert.y}px`;
-                alertDiv.style.width = `${alert.width}px`;
-                alertDiv.style.height = `${alert.height}px`;
-            
-                // Set content based on type: image or text
-                if (alert.type === 'image') {
-                    const img = document.createElement('img');
-                    img.src = alert.src;
-                    img.style.width = '100%';
-                    img.style.height = '100%';
-                    alertDiv.appendChild(img);
-                } else if (alert.type === 'text') {
-                    alertDiv.innerText = alert.content || '';
-                    alertDiv.style.color = alert.color || 'white';
-                }
+      for (const [key, alert] of Object.entries(alertConfig)) {
+        if (alert && typeof alert === 'object' && 'x' in alert && 'y' in alert) {
+          const alertDiv = document.createElement('div');
+          alertDiv.classList.add('alert');
+          alertDiv.id = key; // Set ID for drag handling
+          alertDiv.style.left = `${alert.x}px`;
+          alertDiv.style.top = `${alert.y}px`;
+          alertDiv.style.width = `${alert.width}px`;
+          alertDiv.style.height = `${alert.height}px`;
 
-                alertsContainer.appendChild(alertDiv);
-            }
+          if (alert.type === 'image') {
+            const img = document.createElement('img');
+            img.src = alert.src;
+            img.style.width = '100%';
+            img.style.height = '100%';
+            alertDiv.appendChild(img);
+          } else if (alert.type === 'text') {
+            alertDiv.innerText = alert.content || '';
+            alertDiv.style.color = alert.color || 'white';
+          }
+
+          // Add drag capabilities if in edit mode
+          if (isEditMode) {
+            alertDiv.classList.add('draggable');
+            alertDiv.setAttribute('draggable', 'true');
+            alertDiv.addEventListener('dragstart', handleDragStart);
+            alertDiv.addEventListener('drag', handleDrag);
+            alertDiv.addEventListener('dragend', handleDragEnd);
+          }
+
+          alertsContainer.appendChild(alertDiv);
         }
-    }    
-  </script>  
+      }
+    }
+
+    // Function to toggle edit mode
+    document.getElementById('turnOffEditMode').addEventListener('click', turnOffEditMode);
+
+    function turnOffEditMode() {
+      isEditMode = false;
+      const controls = document.querySelectorAll('.alert');
+
+      // Notify main process to enable or disable click-through
+      window.electronAPI.turnOffEditMode();
+
+      controls.forEach(control => {
+        control.classList.remove('draggable');
+        control.removeAttribute('draggable');
+        control.removeEventListener('dragstart', handleDragStart);
+        control.removeEventListener('drag', handleDrag);
+        control.removeEventListener('dragend', handleDragEnd);
+      });
+    }
+
+    let offsetX, offsetY;
+
+    // Start drag handler
+    function handleDragStart(event) {
+      offsetX = event.clientX - event.target.offsetLeft;
+      offsetY = event.clientY - event.target.offsetTop;
+      event.dataTransfer.setData('text/plain', event.target.id);
+    }
+
+    // Track drag movement to update position
+    function handleDrag(event) {
+      if (event.clientX > 0 && event.clientY > 0) { // Ensure valid drag position
+        event.target.style.left = `${event.clientX - offsetX}px`;
+        event.target.style.top = `${event.clientY - offsetY}px`;
+      }
+    }
+
+    // End drag handler to capture new position
+    function handleDragEnd(event) {
+      const newX = parseInt(event.target.style.left, 10);
+      const newY = parseInt(event.target.style.top, 10);
+      const id = event.target.id;
+
+      // Send the new position back to main.js
+      window.electronAPI.updateVariable('alerts',id, { x: newX, y: newY });
+    }
+  </script>
 </body>
 </html>

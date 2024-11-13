@@ -164,12 +164,11 @@ function createOverlayWindow() {
     }
   });
 
-  overlayWindow.setIgnoreMouseEvents(true); // Makes it click-through
+  overlayWindow.setIgnoreMouseEvents(true, {forward: true}); // Makes it click-through
   overlayWindow.loadFile('src/renderer/overlay.html'); // Load overlay HTML file
   overlayWindow.hide(); // Start hidden
-  const alerts=state['alerts']
   overlayWindow.webContents.on('did-finish-load', () => {
-    overlayWindow.webContents.send('initAlerts', alerts); // Send initial data after loading
+    overlayWindow.webContents.send('initAlerts', state['alerts']); // Send initial data after loading
   });
 
   win.on('close', () => {
@@ -371,9 +370,16 @@ ipcMain.on('toggle-overlay', (event) => {
   if (overlayWindow.isVisible()) {
     overlayWindow.hide();
   } else {
-    const alerts = state['alerts']
-    overlayWindow.webContents.send('updateAlerts', alerts);
+    overlayWindow.setIgnoreMouseEvents(false, { forward: true });
+    overlayWindow.webContents.send('dragAlerts', state['alerts']);
     overlayWindow.show();
   }
 });
+
+// Listen for edit mode toggle and update click-through setting
+ipcMain.on('turnOffEditMode', (event) => {
+  console.log('received turn off edit mode event in main.js');
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true }); // Disable click-through in edit mode
+});
+
 

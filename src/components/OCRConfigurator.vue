@@ -170,7 +170,7 @@
             </b-row>
                         <!-- Button to start OCR region capture -->
             <b-row>
-              <b-button @click="toggleOverlay">Toggle Overlay</b-button>
+              <b-button @click="toggleOverlay">Toggle Overlay in Edit Mode</b-button>
             </b-row>
           </b-col>
         </b-row>

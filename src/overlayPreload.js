@@ -8,11 +8,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         console.log('initAlerts received in preload'); // Debug log
         callback(data);
     }),
-    onUpdateAlerts: (callback) => ipcRenderer.on('updateAlerts', (event, data) => {
+    onDragAlerts: (callback) => ipcRenderer.on('dragAlerts', (event, data) => {
         console.log('updateAlerts received in preload'); // Debug log
         callback(data);
     }),
-
-    // You could also expose a method for sending messages back to main.js, if needed
-    sendAlertPosition: (alertData) => ipcRenderer.send('save-alert-position', alertData)
+    turnOffEditMode: () => ipcRenderer.send('turnOffEditMode'),
+    updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value })
 });
