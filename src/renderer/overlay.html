@@ -52,7 +52,7 @@
       alertsContainer.innerHTML = ''; // Clear existing alerts
 
       for (const [key, alert] of Object.entries(alertConfig)) {
-        if (alert && typeof alert === 'object' && 'x' in alert && 'y' in alert) {
+        if (alert && typeof alert === 'object' && 'x' in alert && 'y' in alert && key !== 'alertsDefault') {
           const alertDiv = document.createElement('div');
           alertDiv.classList.add('alert');
           alertDiv.id = key; // Set ID for drag handling
@@ -70,6 +70,7 @@
           } else if (alert.type === 'text') {
             alertDiv.innerText = alert.content || '';
             alertDiv.style.color = alert.color || 'white';
+            alertDiv.style.fontSize = (alert.textSize || '20') + 'px';
           }
 
           // Add drag capabilities if in edit mode
