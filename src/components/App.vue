@@ -8,6 +8,12 @@
       <b-nav-item @click="currentTab = 'PixelSelector'" :active="currentTab === 'PixelSelector'">
         Pixel Selector
       </b-nav-item>
+      <b-nav-item @click="currentTab = 'AlertDesigner'" :active="currentTab === 'AlertDesigner'">
+        Alert Designer
+      </b-nav-item>
+      <b-nav-item @click="currentTab = 'Conditions'" :active="currentTab === 'Conditions'">
+        Conditions
+      </b-nav-item>
     </b-nav>
 
     <!-- Main Content Area -->
@@ -20,12 +26,16 @@
 <script>
 import OCRConfigurator from './OCRConfigurator.vue';
 import PixelSelector from './PixelSelector.vue';
+import AlertDesigner from './AlertDesigner.vue';
+import Conditions from './Conditions.vue';
 
 export default {
   name: 'App',
   components: {
     OCRConfigurator,
     PixelSelector,
+    AlertDesigner,
+    Conditions
   },
   data() {
     return {
@@ -34,9 +44,20 @@ export default {
   },
   computed: {
     currentTabComponent() {
-      return this.currentTab === 'OCRConfigurator' ? OCRConfigurator : PixelSelector;
-    },
-
+    // Return the appropriate component based on the currentTab value
+    switch (this.currentTab) {
+      case 'OCRConfigurator':
+        return OCRConfigurator;
+      case 'PixelSelector':
+        return PixelSelector;
+      case 'AlertDesigner':
+        return AlertDesigner;
+      case 'Conditions':
+        return Conditions;
+      default:
+        return null; // Or a default component if you have one
+    }
+  }
   },
 };
 </script>

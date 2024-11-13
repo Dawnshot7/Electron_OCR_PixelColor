@@ -36,45 +36,18 @@ app.on('window-all-closed', () => {
 function loadConfig(filePath) {
   const rawConfig = fs.readFileSync(filePath, 'utf-8');
   state = ini.parse(rawConfig);
-  console.log(state);
 
-  // Process each key in ocrRegions and convert it into an actual object
-  for (let key in state.ocrRegions) {
-    if (state.ocrRegions.hasOwnProperty(key)) {
-      const stringVar = state.ocrRegions[key];
-      
-      // Use eval() to convert the string to an object
+  // Parse OCR and pixel coordinates safely if saved as JSON strings
+  for (const section of ['ocrRegions', 'pixelCoords', 'alerts']) {
+    for (const key in state[section]) {
       try {
-        state.ocrRegions[key] = eval(`(${stringVar})`); // Turns string into an object
+        state[section][key] = JSON.parse(state[section][key]);
       } catch (error) {
-        console.error('Error parsing string to object:', error);
+        console.error(`Error parsing ${section} configuration for ${key}:`, error);
       }
     }
   }
-  for (let key in state.pixelCoords) {
-    if (state.pixelCoords.hasOwnProperty(key)) {
-      const stringVar = state.pixelCoords[key];
-      
-      // Use eval() to convert the string to an object
-      try {
-        state.pixelCoords[key] = eval(`(${stringVar})`); // Turns string into an object
-      } catch (error) {
-        console.error('Error parsing string to object:', error);
-      }
-    }
-  }
-  for (let key in state.alerts) {
-    if (state.alerts.hasOwnProperty(key)) {
-      const stringVar = state.alerts[key];
-      
-      // Use eval() to convert the string to an object
-      try {
-        state.alerts[key] = eval(`(${stringVar})`); // Turns string into an object
-      } catch (error) {
-        console.error('Error parsing string to object:', error);
-      }
-    }
-  }
+  console.log(state);
 }
 
 // Save the contents of the state variable into config.ini
@@ -326,18 +299,18 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       state[variableName][key] = { ...state[variableName][key], ...value };
       console.log(`Updated state[${variableName}][${key}]:`, value);
       
+      region = state[variableName]['selected'].regionSelected
+
+      // Process add new region request 
+      if (!state[variableName]['selected'].regions.includes(region)) {
+        // Set default config for the new region
+        state[variableName][region] = { ...state[variableName][`${variableName}Default`] };
+        // Add the region to the regions list
+        state[variableName]['selected'].regions.push(region);
+        console.log(`Added new region: ${region} with default config`, state[variableName]['selected'].regions);
+      } 
+
       if (variableName === 'ocrRegions') {
-        region = state['ocrRegions']['selected'].regionSelected
-
-        // Process add new region request 
-        if (!state['ocrRegions']['selected'].regions.includes(region)) {
-          // Set default config for the new region
-          state['ocrRegions'][region] = { ...state['ocrRegions']['ocrDefault'] };
-          // Add the region to the regions list
-          state['ocrRegions']['selected'].regions.push(region);
-          console.log(`Added new region: ${region} with default config`, state['ocrRegions']['selected'].regions);
-        }       
-
         // Perform OCR and send the recognized text
         const ocrText = await captureAndProcessScreenshot(state[variableName][region]);
         win.webContents.send('ocrText', { ocrText });
