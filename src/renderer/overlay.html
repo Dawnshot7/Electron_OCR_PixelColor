@@ -14,9 +14,9 @@
     }
     .alert {
       position: absolute;
-      border: 2px solid white;
       padding: 20px;
-      background-color: rgba(255, 255, 255, 0.5);
+      background-color: rgba(255, 255, 255, 0.0);
+      display: 'none';
     }
     /* Style for draggable alerts */
     .draggable {
@@ -25,25 +25,37 @@
   </style>
 </head>
 <body>
-  <div class="test-box">Overlay is visible</div>
-  <button id="turnOffEditMode">Turn Off Edit Mode</button> <!-- Button to toggle edit mode -->
+  <button id="turnOffEditMode">Hide Edit Mode Overlay</button> <!-- Button to toggle edit mode -->
   <div id="alerts-container"></div> <!-- Container for dynamic alerts -->
 
   <script>
     // Track edit mode state
     let isEditMode = false;
 
-    // Initialize alerts on load
+    // Initialize all alerts on load
     window.electronAPI.onInitAlerts((alerts) => {
-      isEditMode = false;
       console.log('received initAlerts in overlay');
+      isEditMode = false;
       renderAlerts(alerts);
     });
 
+    // Re-initialize all alerts as visible and draggable in edit mode
     window.electronAPI.onDragAlerts((alerts) => {
       console.log(`received updateAlerts in overlay`, alerts);
       isEditMode = true;
       renderAlerts(alerts);
+    });
+
+    // Show/hide alerts based on continuous IPC data in game mode
+    window.electronAPI.onUpdateVisibleAlerts((visibleAlertIds) => {
+      const alertDivs = document.querySelectorAll('.alert');
+      alertDivs.forEach(alertDiv => {
+        if (visibleAlertIds.includes(alertDiv.id)) {
+          alertDiv.style.display = 'block'; // Show alert
+        } else {
+          alertDiv.style.display = 'none'; // Hide alert
+        }
+      });
     });
 
     // Function to render alerts based on config
@@ -58,8 +70,6 @@
           alertDiv.id = key; // Set ID for drag handling
           alertDiv.style.left = `${alert.x}px`;
           alertDiv.style.top = `${alert.y}px`;
-          alertDiv.style.width = `${alert.width}px`;
-          alertDiv.style.height = `${alert.height}px`;
 
           if (alert.type === 'image') {
             const img = document.createElement('img');
@@ -80,6 +90,7 @@
             alertDiv.addEventListener('dragstart', handleDragStart);
             alertDiv.addEventListener('drag', handleDrag);
             alertDiv.addEventListener('dragend', handleDragEnd);
+            alertDiv.style.display = 'block';            
           }
 
           alertsContainer.appendChild(alertDiv);
@@ -92,17 +103,18 @@
 
     function turnOffEditMode() {
       isEditMode = false;
-      const controls = document.querySelectorAll('.alert');
+      const alertDivs = document.querySelectorAll('.alert');
 
       // Notify main process to enable or disable click-through
       window.electronAPI.turnOffEditMode();
 
-      controls.forEach(control => {
-        control.classList.remove('draggable');
-        control.removeAttribute('draggable');
-        control.removeEventListener('dragstart', handleDragStart);
-        control.removeEventListener('drag', handleDrag);
-        control.removeEventListener('dragend', handleDragEnd);
+      alertDivs.forEach(alertDiv => {
+        alertDiv.classList.remove('draggable');
+        alertDiv.removeAttribute('draggable');
+        alertDiv.removeEventListener('dragstart', handleDragStart);
+        alertDiv.removeEventListener('drag', handleDrag);
+        alertDiv.removeEventListener('dragend', handleDragEnd);
+        alertDiv.style.display = 'none';  
       });
     }
 

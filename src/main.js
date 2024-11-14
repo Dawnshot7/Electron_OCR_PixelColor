@@ -102,13 +102,13 @@ function createWindow() {
   // Set an interval to monitor the pixel color and OCR repeatedly
   setInterval(async () => {
 
-    // Get the pixel color from state.pixelCoords.pixelCoord1
+    // Get the pixel color from selected pixel
     if (state['pixelCoords']['selected'].live) {
       const selectedRegion = state['pixelCoords']['selected'].regionSelected
       const selectedX = state['pixelCoords'][selectedRegion].x
       const selectedY = state['pixelCoords'][selectedRegion].y
       const color = robot.getPixelColor(selectedX, selectedY);
-      win.webContents.send('pixelColor', { selectedX, selectedY, color }); // Sending pixel data
+      //win.webContents.send('pixelColor', { selectedX, selectedY, color }); // Sending pixel data
     }
     // Perform OCR on selected region
     if (state['ocrRegions']['selected'].live) {
@@ -221,6 +221,7 @@ function recognizeTextFromImage(imagePath) {
 
 // Run Autohotkey scripts to capture user mouse clicks to select coordinates. 
 ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
+  console.log('starting ahk script');
   // getBoxCoords.ahk collects two mouse clicks, getPixelCoords.ahk collects one click
   const ahkPath = path.join(__dirname, '../scripts/AutoHotkeyA32.exe');
   const ahkScript = path.join(__dirname, `../scripts/${scriptName}.ahk`);
@@ -248,6 +249,7 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
         // Perform OCR and send the recognized text
         const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][thisRegion]);
         win.webContents.send('ocrText', { ocrText });
+        win.webContents.send('updateConfig', { thisData });
         console.log('Image processed and saved successfully');
     
         // Read and send the images
@@ -258,19 +260,19 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
       } else if (scriptName === 'getPixelCoords'){
         // Put stdout into variables
         const [x1, y1] = output.split(" ").map(Number);
-        console.log(`Setting Pixel to: (${x1}, ${y1})`);
 
         // Update coordinates and desired color for .regionSelected
         const thisRegion = state['pixelCoords']['selected'].regionSelected
-        thisData = {
+        const pixelData = {
           x: x1,
           y: y1,
           color: robot.getPixelColor(x1, y1),
         };
-        state['pixelCoords'][thisRegion] = { ...state['pixelCoords'][thisRegion], ...thisData };
-      
+        console.log(`Setting Pixel to: (${x1}, ${y1}), color:${pixelData.color}`);
+
+        state['pixelCoords'][thisRegion] = { ...state['pixelCoords'][thisRegion], ...pixelData };
         // Send current coords and color of new pixel to be displayed by component
-        win.webContents.send('pixelColor', { x, y, color });
+        win.webContents.send('updateConfig', { pixelData });
       }      
       saveConfig('src/config/config.ini');   
     } else {
@@ -346,6 +348,7 @@ ipcMain.on('toggle-overlay', (event) => {
     overlayWindow.setIgnoreMouseEvents(false, { forward: true });
     overlayWindow.webContents.send('dragAlerts', state['alerts']);
     overlayWindow.show();
+    win.hide();
   }
 });
 
@@ -353,6 +356,8 @@ ipcMain.on('toggle-overlay', (event) => {
 ipcMain.on('turnOffEditMode', (event) => {
   console.log('received turn off edit mode event in main.js');
   overlayWindow.setIgnoreMouseEvents(true, { forward: true }); // Disable click-through in edit mode
+  overlayWindow.hide();
+  win.show()
 });
 
 

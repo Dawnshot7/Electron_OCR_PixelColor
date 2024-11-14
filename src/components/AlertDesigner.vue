@@ -38,12 +38,15 @@
       <b-col cols="9" md="9">
         <!-- Alert Preview -->
         <b-row class="align-items-center mb-3">
-          <b-col cols="4" md="4">
-          </b-col>
+          <div 
+            class="d-flex justify-content-center align-items-center" 
+            :style="{ whiteSpace: 'nowrap', overflow: 'hidden', height: '175px', color: alertsConfig.color, fontSize: alertsConfig.textSize + 'px' }"
+            >{{ alertsConfig.content }}
+          </div>
         </b-row>
          
         <!-- Alert Configuration Fields -->
-        <b-row>
+        <b-row class="mt-3">
           <!-- Left column: Position Controls, Overlay Toggle -->
           <b-col cols="4" md="4">
             <b-row class="mt-3">
@@ -58,7 +61,7 @@
             <!-- Toggle Overlay Button -->
             <b-row class="mt-3">
               <b-col cols="12" md="12">
-                <b-button @click="toggleOverlay">Show Overlay in Edit Mode</b-button>
+                <b-button @click="toggleOverlay">View and Move Alerts</b-button>
               </b-col>
             </b-row>
           </b-col>
@@ -115,8 +118,6 @@ export default {
       alertsConfig: {
         x: 0,
         y: 0,
-        width: 200,
-        height: 200,
         content: 'initial',      // Alert text
         textSize: 24,  // Font size for the alert text
         color: 'Green', // Default color for font
@@ -151,7 +152,7 @@ export default {
       window.electronAPI.updateVariable('alerts', this.alertsList.regionSelected, { color: color });
     },
     adjustFontSize(delta) {
-      this.alertsConfig.textSize = Math.max(12, Math.min(48, this.alertsConfig.textSize + delta));
+      this.alertsConfig.textSize = Math.max(12, Math.min(192, this.alertsConfig.textSize + delta));
       window.electronAPI.updateVariable('alerts', this.alertsList.regionSelected, { textSize: this.alertsConfig.textSize });
     },
   },

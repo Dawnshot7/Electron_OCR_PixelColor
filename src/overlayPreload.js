@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
         console.log('updateAlerts received in preload'); // Debug log
         callback(data);
     }),
+    onUpdateVisibleAlerts: (callback) => ipcRenderer.on('updateVisibleAlerts', (event, data) => {
+        console.log('updateVisibleAlerts received in preload'); // Debug log
+        callback(data);
+    }),
     turnOffEditMode: () => ipcRenderer.send('turnOffEditMode'),
     updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value })
 });

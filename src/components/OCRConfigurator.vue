@@ -43,7 +43,7 @@
       <!-- All other content in component -->
       <b-col cols="9" md="9" class="image-region">
         <!-- Display unmodified image, modified image and OCR text in top Row -->
-        <b-row class="align-items-center mb-3">
+        <b-row class="align-items-center mb-3" style="height: 100px;">
 
           <!-- Images Side by Side -->
           <b-col cols="4" md="4">
@@ -160,18 +160,16 @@
             
           </b-col>
 
-          <!-- Placeholder column for other options -->
+          <!-- Third column for toggle live OCR -->
           <b-col cols="4" md="4">
+
             <!-- Live OCR text checkbox -->
             <b-row class="mt-3">
               <div class="d-flex justify-content-center">
                 <b-form-checkbox v-model="ocrList.live" @change="toggleLive">Live OCR text</b-form-checkbox>
               </div>
             </b-row>
-                        <!-- Button to start OCR region capture -->
-            <b-row>
-              <b-button @click="toggleOverlay">Toggle Overlay in Edit Mode</b-button>
-            </b-row>
+ 
           </b-col>
         </b-row>
       </b-col>
