@@ -38,7 +38,7 @@ function loadConfig(filePath) {
   state = ini.parse(rawConfig);
 
   // Parse OCR and pixel coordinates safely if saved as JSON strings
-  for (const section of ['ocrRegions', 'pixelCoords', 'alerts']) {
+  for (const section of ['ocrRegions', 'pixelCoords', 'alerts', 'conditions']) {
     for (const key in state[section]) {
       try {
         state[section][key] = JSON.parse(state[section][key]);
