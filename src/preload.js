@@ -8,8 +8,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value }),
   // Used by OCRConfigurator and PixelSelector components to select coordinates for OCR boxes and pixels
   runAhkScript: (scriptName, arg1, arg2) => ipcRenderer.send('run-ahk-script', { scriptName, arg1, arg2 }),
-  // Used by all components to toggle visibility of alert overlay
-  showDraggableOverlay: () => ipcRenderer.send('showDraggableOverlay'),
+  // Used by AlertDesigner component to show draggable, clickable alert overlay
+  showDraggableOverlay: () => ipcRenderer.send('showDraggableOverlay'),  
+  // Used by conditions to toggle visibility of game-mode alert overlay
+  toggleGameModeOverlay: () => ipcRenderer.send('toggleGameModeOverlay'),
   
   // Used by all components to populate their listboxes on component load
   onupdateList: (callback) => ipcRenderer.on('updateList', (event, data) => callback(data)),

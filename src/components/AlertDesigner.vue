@@ -137,7 +137,7 @@ export default {
       window.electronAPI.updateVariable('alerts', 'selected', { regionSelected: newSelection });
     },
     addRegion() {
-      const newRegion = `alerts${this.alertsList.regions.length + 1}`;
+      const newRegion = `alert${this.alertsList.regions.length + 1}`;
       this.alertsList.regions.push(newRegion);
       this.regionChange(newRegion);
     },

@@ -59,6 +59,12 @@
           <!-- Third column with toggle overlay in game-mode -->
           <b-col cols="4" md="4">
 
+            <!-- Toggle Overlay Button -->
+            <b-row class="mt-3">
+              <b-col cols="12" md="12">
+                <b-button @click="toggleGameModeOverlay">Toggle Game-mode Overlay</b-button>
+              </b-col>
+            </b-row>
           </b-col>
         </b-row>
       </b-col>
@@ -101,11 +107,15 @@
       this.conditionsList.regions.push(newRegion);
       // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
-    }
+    },
+    toggleGameModeOverlay() {
+      window.electronAPI.toggleGameModeOverlay();
+      console.log('Toggled game-mode overlay');
+    },
   },
   mounted() {
     // Trigger main.js to send list, config and images on component load 
-    window.electronAPI.updateVariable('conditions', 'selected', { live: false });
+    window.electronAPI.updateVariable('conditions', 'selected', {});
     
     // Listen for variable updates to populate the form fields
     window.electronAPI.onupdateConfig(({ selectedValues }) => {

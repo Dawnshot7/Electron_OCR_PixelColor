@@ -104,7 +104,8 @@ function createWindow() {
     // Evaluate all conditions and send list of alerts to the overlay in game mode
     if (state['conditions']['selected'].live) {
       const alertList = await evaluateConditions();
-      updateVisibleAlerts(alertList);
+      overlayWindow.webContents.send('updateVisibleAlerts', alertList);
+      console.log(`Alert list: `, alertList);
     }  
   
     // Get the pixel color from selected pixel on Pixel Selector component
@@ -233,22 +234,27 @@ async function evaluateConditions() {
     const condition = state['conditions'][conditionKey];
     let truecount = 0;
     let falsecount = 0;
-
+    if (conditionKey === 'selected' || conditionKey === 'conditionsDefault') {
+      continue;
+    }
     // Check OCR regions if available
     if (condition.ocrRegions) {
       // Perform OCR within the specified region
-      const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][condition.ocrRegions]);
+      const ocrRegion = condition.ocrRegions;
+      console.log(`Sending for ocr with: `, state.ocrRegions.ocrRegion);
+      const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][ocrRegion]);
 
       // Check if OCR result matches the regex
       const regex = new RegExp(condition.regex);
       const match = ocrText.match(regex);
+      console.log(`Received: ${ocrText}, used regex: ${regex}, and got match result: `, match);
 
       if (match) {
         // Loop through each target in the matches array and perform the comparison
         for (let i = 0; i < condition.matches.length; i++) {
           const target = condition.matches[i];
           const matchedText = match[i + 1]; // Assuming capturing groups start from index 1 in the match array
-
+          console.log(`Match was true, i=${i}, matchedText: ${matchedText}, target value: ${target.value}, target comparison: ${target.comparison}`)
           // Perform comparison based on the specified type
           switch (target.comparison) {
             case 'equals':
@@ -270,6 +276,8 @@ async function evaluateConditions() {
               console.warn(`Unknown comparison type: ${target.comparison}`);
           }
         }
+        console.log(`Truecount: ${truecount}, falsecount: ${falsecount}`)
+
       }
     }
 
@@ -277,22 +285,24 @@ async function evaluateConditions() {
     if (condition.pixelCoords.length > 0) {
       for (let i = 0; i < condition.pixelCoords.length; i++) {
         const pixelCoord = condition.pixelCoords[i];
-        const { x, y, savedColor } = state['pixelCoords'][pixelCoord];
-        const expectedColor = condition.pixelComparision[i];
-
+        const { x, y, color } = state['pixelCoords'][pixelCoord];
+        const comparison = condition.pixelComparision[i];
+        console.log(`pixelCoord: ${pixelCoord}, x: ${x}, y: ${y}, color: ${color}, comparison: ${comparison}, i: ${i}`)
         if (x && y) {
           // Get the color at specified pixel using RobotJS
           const colorAtPixel = robot.getPixelColor(x, y);
 
           // Check color based on the specified comparison
-          if (expectedColor === "equals" && colorAtPixel === savedColor) {
+          if (comparison === "equals" && colorAtPixel === color) {
             truecount++;
-          } else if (expectedColor === "notEquals" && colorAtPixel !== savedColor) {
+          } else if (comparison === "notEquals" && colorAtPixel !== color) {
             truecount++;
           } else {
             falsecount++;
           }
         }
+        console.log(`Truecount: ${truecount}, falsecount: ${falsecount}`)
+
       }
     }
 
@@ -453,9 +463,9 @@ ipcMain.on('toggleGameModeOverlay', (event) => {
     state['conditions']['selected'].live = true;
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     overlayWindow.show();
-    win.hide();
   } else {
     state['conditions']['selected'].live = false;
+    saveConfig('src/config/config.ini');
     overlayWindow.hide();
   }
 });
