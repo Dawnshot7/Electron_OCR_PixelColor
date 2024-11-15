@@ -102,6 +102,7 @@ function createWindow() {
   // Set an interval to monitor the pixel color and OCR repeatedly
   setInterval(async () => {
 
+  
     // Get the pixel color from selected pixel
     if (state['pixelCoords']['selected'].live) {
       const selectedRegion = state['pixelCoords']['selected'].regionSelected
@@ -218,6 +219,87 @@ function recognizeTextFromImage(imagePath) {
     resolve(text); // Resolve with the recognized text
   });
 }
+
+// Function to perform OCR and check pixel conditions
+async function evaluateConditions() {
+  const alerts = []; // Store triggered alerts
+
+  // Loop through each condition in the state['conditions']
+  for (const conditionKey in state['conditions']) {
+    const condition = state['conditions'][conditionKey];
+    let truecount = 0;
+    let falsecount = 0;
+
+    // Check OCR regions if available
+    if (condition.ocrRegions) {
+      // Perform OCR within the specified region
+      const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][condition.ocrRegions]);
+
+      // Check if OCR result matches the regex
+      const regex = new RegExp(condition.regex);
+      const match = ocrText.match(regex);
+
+      if (match) {
+        // Loop through each target in the matches array and perform the comparison
+        for (let i = 0; i < condition.matches.length; i++) {
+          const target = condition.matches[i];
+          const matchedText = match[i + 1]; // Assuming capturing groups start from index 1 in the match array
+
+          // Perform comparison based on the specified type
+          switch (target.comparison) {
+            case 'equals':
+              matchedText === target.value[0] ? truecount++ : falsecount++;
+              break;
+            case 'notEquals':
+              matchedText !== target.value[0] ? truecount++ : falsecount++;
+              break;
+            case 'lessThan':
+              matchedText < target.value[0] ? truecount++ : falsecount++;
+              break;
+            case 'greaterThan':
+              matchedText > target.value[0] ? truecount++ : falsecount++;
+              break;
+            case 'between':
+              matchedText > target.value[0] && matchedText < target.value[1] ? truecount++ : falsecount++;
+              break;
+            default:
+              console.warn(`Unknown comparison type: ${target.comparison}`);
+          }
+        }
+      }
+    }
+
+    // Check pixel color conditions if available
+    if (condition.pixelCoords.length > 0) {
+      for (let i = 0; i < condition.pixelCoords.length; i++) {
+        const pixelCoord = condition.pixelCoords[i];
+        const { x, y, savedColor } = state['pixelCoords'][pixelCoord];
+        const expectedColor = condition.pixelComparision[i];
+
+        if (x && y) {
+          // Get the color at specified pixel using RobotJS
+          const colorAtPixel = robot.getPixelColor(x, y);
+
+          // Check color based on the specified comparison
+          if (expectedColor === "equals" && colorAtPixel === savedColor) {
+            truecount++;
+          } else if (expectedColor === "notEquals" && colorAtPixel !== savedColor) {
+            truecount++;
+          } else {
+            falsecount++;
+          }
+        }
+      }
+    }
+
+    // If all conditions for this alert are met, add it to alerts array
+    if (truecount > 0 && falsecount === 0) {
+      alerts.push(condition.alert);
+    }
+  }
+  return alerts;
+}
+
 
 // Run Autohotkey scripts to capture user mouse clicks to select coordinates. 
 ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
