@@ -415,6 +415,11 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       // Handle region change and component load by sending config and listbox data
       const selectedRegion = state[variableName].selected.regionSelected;
       const selectedValues = state[variableName][selectedRegion];
+      if (variableName === 'conditions') {
+        state['conditions']['selected'].ocrRegions = state['ocrRegions']['selected'].regions;
+        state['conditions']['selected'].pixelRegions = state['pixelCoords']['selected'].regions;
+        state['conditions']['selected'].alertRegions = state['alerts']['selected'].regions;
+      }
       const selectedList = state[variableName]['selected'];
       win.webContents.send('updateList', { selectedList });
       win.webContents.send('updateConfig', { selectedValues });
