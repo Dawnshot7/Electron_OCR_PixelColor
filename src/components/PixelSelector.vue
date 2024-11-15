@@ -170,6 +170,15 @@
         console.log('received list');
       }
     }); 
+
+    // Listen for updates to populate the list box on component load
+    window.electronAPI.onpixelColor(({ selectedList }) => {
+      if (selectedList) {
+        // Populate fields from selectedValues
+        this.pixelConfig = { ...this.pixelConfig, ...selectedList };
+        console.log('received color');
+      }
+    }); 
   },
 };
 </script>

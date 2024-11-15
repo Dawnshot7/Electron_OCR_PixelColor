@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Used by OCRConfigurator and PixelSelector components to select coordinates for OCR boxes and pixels
   runAhkScript: (scriptName, arg1, arg2) => ipcRenderer.send('run-ahk-script', { scriptName, arg1, arg2 }),
   // Used by all components to toggle visibility of alert overlay
-  toggleOverlay: () => ipcRenderer.send('toggle-overlay'),
+  showDraggableOverlay: () => ipcRenderer.send('showDraggableOverlay'),
   
   // Used by all components to populate their listboxes on component load
   onupdateList: (callback) => ipcRenderer.on('updateList', (event, data) => callback(data)),

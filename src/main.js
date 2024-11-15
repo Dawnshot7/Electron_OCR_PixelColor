@@ -101,17 +101,21 @@ function createWindow() {
 
   // Set an interval to monitor the pixel color and OCR repeatedly
   setInterval(async () => {
-
+    // Evaluate all conditions and send list of alerts to the overlay in game mode
+    if (state['conditions']['selected'].live) {
+      const alertList = await evaluateConditions();
+      updateVisibleAlerts(alertList);
+    }  
   
-    // Get the pixel color from selected pixel
+    // Get the pixel color from selected pixel on Pixel Selector component
     if (state['pixelCoords']['selected'].live) {
       const selectedRegion = state['pixelCoords']['selected'].regionSelected
       const selectedX = state['pixelCoords'][selectedRegion].x
       const selectedY = state['pixelCoords'][selectedRegion].y
       const color = robot.getPixelColor(selectedX, selectedY);
-      //win.webContents.send('pixelColor', { selectedX, selectedY, color }); // Sending pixel data
+      win.webContents.send('pixelColor', { color }); // Sending pixel data
     }
-    // Perform OCR on selected region
+    // Perform OCR on selected region on OCR Configurator component
     if (state['ocrRegions']['selected'].live) {
       const selectedRegion = state['ocrRegions']['selected'].regionSelected
       const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][selectedRegion]);
@@ -422,24 +426,33 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
   }
 });
 
-// IPC listener to toggle overlay visibility
-ipcMain.on('toggle-overlay', (event) => {
-  if (overlayWindow.isVisible()) {
-    overlayWindow.hide();
-  } else {
-    overlayWindow.setIgnoreMouseEvents(false, { forward: true });
-    overlayWindow.webContents.send('dragAlerts', state['alerts']);
-    overlayWindow.show();
-    win.hide();
-  }
+// IPC listener to show overlay with draggable controls
+ipcMain.on('showDraggableOverlay', (event) => {
+  overlayWindow.setIgnoreMouseEvents(false, { forward: true });
+  overlayWindow.webContents.send('dragAlerts', state['alerts']);
+  overlayWindow.show();
+  win.hide();
 });
 
-// Listen for edit mode toggle and update click-through setting
-ipcMain.on('turnOffEditMode', (event) => {
-  console.log('received turn off edit mode event in main.js');
+// Listen to hide overlay with draggable controls
+ipcMain.on('hideDraggableOverlay', (event) => {
+  console.log('received hide draggable overlay event in main.js');
   overlayWindow.setIgnoreMouseEvents(true, { forward: true }); // Disable click-through in edit mode
   overlayWindow.hide();
   win.show()
+});
+
+// IPC listener to toggle game-mode click-through overlay
+ipcMain.on('toggleGameModeOverlay', (event) => {
+  if (!state['conditions']['selected'].live) {
+    state['conditions']['selected'].live = true;
+    overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+    overlayWindow.show();
+    win.hide();
+  } else {
+    state['conditions']['selected'].live = false;
+    overlayWindow.hide();
+  }
 });
 
 

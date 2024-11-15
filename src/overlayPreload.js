@@ -16,6 +16,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         console.log('updateVisibleAlerts received in preload'); // Debug log
         callback(data);
     }),
-    turnOffEditMode: () => ipcRenderer.send('turnOffEditMode'),
+    hideDraggableOverlay: () => ipcRenderer.send('hideDraggableOverlay'),
     updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value })
 });

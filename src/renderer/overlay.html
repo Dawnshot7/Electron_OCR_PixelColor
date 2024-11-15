@@ -25,7 +25,7 @@
   </style>
 </head>
 <body>
-  <button id="turnOffEditMode">Hide Edit Mode Overlay</button> <!-- Button to toggle edit mode -->
+  <button id="hideDraggableOverlay">Hide Edit Mode Overlay</button> <!-- Button to toggle edit mode -->
   <div id="alerts-container"></div> <!-- Container for dynamic alerts -->
 
   <script>
@@ -99,14 +99,14 @@
     }
 
     // Function to toggle edit mode
-    document.getElementById('turnOffEditMode').addEventListener('click', turnOffEditMode);
+    document.getElementById('hideDraggableOverlay').addEventListener('click', hideDraggableOverlay);
 
-    function turnOffEditMode() {
+    function hideDraggableOverlay() {
       isEditMode = false;
       const alertDivs = document.querySelectorAll('.alert');
 
       // Notify main process to enable or disable click-through
-      window.electronAPI.turnOffEditMode();
+      window.electronAPI.hideDraggableOverlay();
 
       alertDivs.forEach(alertDiv => {
         alertDiv.classList.remove('draggable');

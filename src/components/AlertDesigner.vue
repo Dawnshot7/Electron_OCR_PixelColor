@@ -61,7 +61,7 @@
             <!-- Toggle Overlay Button -->
             <b-row class="mt-3">
               <b-col cols="12" md="12">
-                <b-button @click="toggleOverlay">View and Move Alerts</b-button>
+                <b-button @click="showDraggableOverlay">View and Move Alerts</b-button>
               </b-col>
             </b-row>
           </b-col>
@@ -141,9 +141,9 @@ export default {
       this.alertsList.regions.push(newRegion);
       this.regionChange(newRegion);
     },
-    toggleOverlay() {
-      window.electronAPI.toggleOverlay();
-      console.log('Toggled overlay');
+    showDraggableOverlay() {
+      window.electronAPI.showDraggableOverlay();
+      console.log('Showed draggable overlay');
     },
     updateAlertText(text) {
       window.electronAPI.updateVariable('alerts', this.alertsList.regionSelected, { content: text });
