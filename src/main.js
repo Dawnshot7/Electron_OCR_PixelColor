@@ -29,6 +29,7 @@ app.on('ready', () => {
 
 // Quit the app when all windows are closed, unless on macOS
 app.on('window-all-closed', () => {
+  saveConfig('src/config/config.ini');
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -465,7 +466,6 @@ ipcMain.on('toggleGameModeOverlay', (event) => {
     overlayWindow.show();
   } else {
     state['conditions']['selected'].live = false;
-    saveConfig('src/config/config.ini');
     overlayWindow.hide();
   }
 });

@@ -46,18 +46,92 @@
         <!-- Main row with Condition Configuration Fields in Columns -->
         <b-row>
 
-          <!-- Left column with rename, delete condition -->
-          <b-col cols="4" md="4">
+          <!-- Left column with  -->
+          <b-col cols="6" md="6">
+            <h4>OCR Configuration</h4>
 
+            <!-- Select OCR Region -->
+            <b-form-group label="OCR Region">
+              <b-form-select
+              v-model="conditionsConfig.ocrRegions"
+              :options="conditionsList.ocrRegions"
+              ></b-form-select>
+            </b-form-group>
+
+            <!-- Regex Input -->
+            <b-form-group label="Regex Pattern">
+              <b-form-input v-model="conditionsConfig.regex" placeholder="(.*)"></b-form-input>
+            </b-form-group>
+
+            <!-- Matches (Dynamic Fields) -->
+            <div>
+              <h5>Matches</h5>
+              <div
+              v-for="(match, index) in conditionsConfig.matches"
+              :key="`match-${index}`"
+              class="mb-2"
+              >
+              <b-row>
+                <b-col cols="4">
+                <b-form-select
+                  v-model="match[0]"
+                  :options="['equals', 'notEquals', 'lessThan', 'greaterThan', 'between']"
+                ></b-form-select>
+                </b-col>
+                <b-col cols="4">
+                <b-form-input
+                  v-model="match[1]"
+                  placeholder="value"
+                ></b-form-input>
+                </b-col>
+                <b-col cols="4">
+                  <div
+                  v-if="match[0] === 'between'"
+                  class="mb-2"
+                  >
+                  <b-form-input
+                    v-model="match[2]"
+                    placeholder="value"
+                  ></b-form-input>
+                </div>
+                </b-col>
+              </b-row>
+              </div>
+              <b-button @click="addMatch" variant="success" size="sm">Add Match Group</b-button>
+              <b-button @click="deleteMatch" variant="success" size="sm">Delete Match Group</b-button>
+            </div>
           </b-col>
 
-          <!-- Second column with condition dropdown listboxes, checkboxes, edit fields -->
-          <b-col cols="4" md="4">
+          <!-- Right column with  -->
+          <b-col cols="6" md="6">
+            <h4>Pixel Configuration</h4>
 
-          </b-col>
-
-          <!-- Third column with toggle overlay in game-mode -->
-          <b-col cols="4" md="4">
+            <!-- Dynamic Pixel Coordinates -->
+            <div>
+              <h5>Pixel Conditions</h5>
+              <div
+              v-for="(coord, index) in conditionsConfig.pixelCoords"
+              :key="`pixel-${index}`"
+              class="mb-2"
+              >
+              <b-row>
+                <b-col cols="4">
+                <b-form-select
+                  v-model="conditionsConfig.pixelCoords[index]"
+                  :options="conditionsList.pixelRegions"
+                ></b-form-select>
+                </b-col>
+                <b-col cols="4">
+                <b-form-select
+                  v-model="conditionsConfig.pixelComparison[index]"
+                  :options="['equals', 'notEquals']"
+                ></b-form-select>
+                </b-col>
+              </b-row>
+              </div>
+              <b-button @click="addPixelCoord" variant="success" size="sm">Add Pixel</b-button>
+              <b-button @click="deletePixelCoord" variant="success" size="sm">Delete Pixel</b-button>
+            </div>
 
             <!-- Toggle Overlay Button -->
             <b-row class="mt-3">
@@ -73,6 +147,7 @@
 </template>
 
 <script>
+  import { toRaw } from 'vue';
   export default {
   data() {
     return {
@@ -98,6 +173,8 @@
   methods: {
     regionChange(newSelection) {
       // Change ocr box being displayed and have main.js send the new box's config data
+      const serializableConfig = toRaw(this.conditionsConfig);
+      window.electronAPI.updateVariable('conditions', this.conditionsList.regionSelected, serializableConfig );
       this.conditionsList.regionSelected = newSelection;
       window.electronAPI.updateVariable('conditions', 'selected', { regionSelected: newSelection });
     },
@@ -108,10 +185,29 @@
       // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
     },
-    toggleGameModeOverlay() {
+    addMatch() {
+	  // Add new match field
+      this.conditionsConfig.matches.push({ value: '', comparison: '' });
+    },
+    deleteMatch() {
+	  // Delete bottom match field
+      this.conditionsConfig.matches.pop();
+    },    
+	  addPixelCoord() {
+    // Add new pixel coordinate
+      this.conditionsConfig.pixelCoords.push('');
+      this.conditionsConfig.pixelComparison.push('');
+    },
+	  deletePixelCoord() {
+    // Delete bottom pixel coordinate
+      this.conditionsConfig.pixelCoords.pop();
+    },
+	  toggleGameModeOverlay() {
+      const serializableConfig = toRaw(this.conditionsConfig);
+      window.electronAPI.updateVariable('conditions', this.conditionsList.regionSelected, serializableConfig );
       window.electronAPI.toggleGameModeOverlay();
       console.log('Toggled game-mode overlay');
-    },
+    }
   },
   mounted() {
     // Trigger main.js to send list, config and images on component load 
@@ -135,6 +231,10 @@
       }
     }); 
   },
+  unmounted() {
+    const serializableConfig = toRaw(this.conditionsConfig);
+    window.electronAPI.updateVariable('conditions', this.conditionsList.regionSelected, serializableConfig );
+  }
 };
 </script>
   
