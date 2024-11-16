@@ -255,26 +255,26 @@ async function evaluateConditions() {
         for (let i = 0; i < condition.matches.length; i++) {
           const target = condition.matches[i];
           const matchedText = match[i + 1]; // Assuming capturing groups start from index 1 in the match array
-          console.log(`Match was true, i=${i}, matchedText: ${matchedText}, target value: ${target.value}, target comparison: ${target.comparison}`)
+          console.log(`Match was true, i=${i}, matchedText: ${matchedText}, target value: ${target[1]}, target comparison: ${target[0]}`)
           // Perform comparison based on the specified type
-          switch (target.comparison) {
+          switch (target[0]) {
             case 'equals':
-              matchedText === target.value[0] ? truecount++ : falsecount++;
+              matchedText === target[1] ? truecount++ : falsecount++;
               break;
             case 'notEquals':
-              matchedText !== target.value[0] ? truecount++ : falsecount++;
+              matchedText !== target[1] ? truecount++ : falsecount++;
               break;
             case 'lessThan':
-              matchedText < target.value[0] ? truecount++ : falsecount++;
+              matchedText < target[1] ? truecount++ : falsecount++;
               break;
             case 'greaterThan':
-              matchedText > target.value[0] ? truecount++ : falsecount++;
+              matchedText > target[1] ? truecount++ : falsecount++;
               break;
             case 'between':
-              matchedText > target.value[0] && matchedText < target.value[1] ? truecount++ : falsecount++;
+              matchedText > target[1] && matchedText < target.value[2] ? truecount++ : falsecount++;
               break;
             default:
-              console.warn(`Unknown comparison type: ${target.comparison}`);
+              console.warn(`Unknown comparison type: ${target[0]}`);
           }
         }
         console.log(`Truecount: ${truecount}, falsecount: ${falsecount}`)
@@ -287,7 +287,7 @@ async function evaluateConditions() {
       for (let i = 0; i < condition.pixelCoords.length; i++) {
         const pixelCoord = condition.pixelCoords[i];
         const { x, y, color } = state['pixelCoords'][pixelCoord];
-        const comparison = condition.pixelComparision[i];
+        const comparison = condition.pixelComparison[i];
         console.log(`pixelCoord: ${pixelCoord}, x: ${x}, y: ${y}, color: ${color}, comparison: ${comparison}, i: ${i}`)
         if (x && y) {
           // Get the color at specified pixel using RobotJS
@@ -401,13 +401,18 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       region = state[variableName]['selected'].regionSelected
 
       // Process add new region request 
-      if (!state[variableName]['selected'].regions.includes(region)) {
+      if (!state[variableName]['selected'].regions.includes(region) && !state[variableName][region]) {
         // Set default config for the new region
         state[variableName][region] = { ...state[variableName][`${variableName}Default`] };
         // Add the region to the regions list
         state[variableName]['selected'].regions.push(region);
         console.log(`Added new region: ${region} with default config`, state[variableName]['selected'].regions);
       } 
+      // Process delete region request
+      if (!state[variableName]['selected'].regions.includes(region) && state[variableName][region]) {
+        delete state[variableName][region];
+        state[variableName]['selected'].regionSelected = state[variableName]['selected'].regions[0];
+      }
 
       if (variableName === 'ocrRegions') {
         // Perform OCR and send the recognized text
@@ -461,6 +466,7 @@ ipcMain.on('hideDraggableOverlay', (event) => {
 // IPC listener to toggle game-mode click-through overlay
 ipcMain.on('toggleGameModeOverlay', (event) => {
   if (!state['conditions']['selected'].live) {
+    overlayWindow.webContents.send('initAlerts', state['alerts']);
     state['conditions']['selected'].live = true;
     overlayWindow.setIgnoreMouseEvents(true, { forward: true });
     overlayWindow.show();

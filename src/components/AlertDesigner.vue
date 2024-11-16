@@ -36,6 +36,10 @@
 
       <!-- Main column with Alert Configuration Fields -->
       <b-col cols="9" md="9">
+        
+        <!-- Delete region button -->
+        <b-button @click="deleteRegion" variant="success" size="sm">Delete Region</b-button>
+
         <!-- Alert Preview -->
         <b-row class="align-items-center mb-3">
           <div 
@@ -61,7 +65,7 @@
             <!-- Toggle Overlay Button -->
             <b-row class="mt-3">
               <b-col cols="12" md="12">
-                <b-button @click="showDraggableOverlay">View and Move Alerts</b-button>
+                <b-button @click="showDraggableOverlay" variant="warning">View and Move Alerts</b-button>
               </b-col>
             </b-row>
           </b-col>
@@ -72,7 +76,7 @@
             <b-row class="mt-3">
               <b-form-group label="Alert Text" label-for="alertText">
                 <b-form-input id="alertText" v-model="alertsConfig.content" placeholder="Enter alert text"></b-form-input>
-                <b-button @click="updateAlertText(alertsConfig.content)">Submit</b-button>
+                <b-button @click="updateAlertText(alertsConfig.content)" variant="success">Submit</b-button>
               </b-form-group>
             </b-row>
 
@@ -106,6 +110,7 @@
 </template>
 
 <script>
+import { toRaw } from 'vue';
 export default {
   data() {
     return {
@@ -135,11 +140,20 @@ export default {
     regionChange(newSelection) {
       this.alertsList.regionSelected = newSelection;
       window.electronAPI.updateVariable('alerts', 'selected', { regionSelected: newSelection });
+      window.electronAPI.updateVariable('alerts', 'selected', { regions: this.alertsList.regions });
     },
     addRegion() {
       const newRegion = `alert${this.alertsList.regions.length + 1}`;
       this.alertsList.regions.push(newRegion);
       this.regionChange(newRegion);
+    },
+    deleteRegion() {
+      if (this.alertsList.regions.length > 1) {
+        const index = this.alertsList.regions.findIndex(region => region === this.alertsList.regionSelected);
+        this.alertsList.regions.splice(index, 1);
+        const serializableRegions = toRaw(this.alertsList);
+        window.electronAPI.updateVariable('alerts', 'selected', serializableRegions);
+      }  
     },
     showDraggableOverlay() {
       window.electronAPI.showDraggableOverlay();

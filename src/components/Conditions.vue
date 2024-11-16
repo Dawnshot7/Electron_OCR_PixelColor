@@ -42,7 +42,21 @@
 
       <!-- All other content in component -->
       <b-col cols="9" md="9" class="image-region"> 
-        
+
+        <!-- Top row with delete, rename region, toggle overlay -->
+        <b-row class="mt-3">
+
+          <b-col cols="6" md="6">
+            <!-- Delete region button -->
+            <b-button @click="deleteRegion" variant="success" size="sm">Delete Region</b-button>
+          </b-col>
+          <b-col cols="6" md="6">
+            <!-- Toggle overlay button -->
+            <b-button @click="toggleGameModeOverlay" variant="warning">Toggle Game-mode Overlay</b-button>
+          </b-col>
+
+        </b-row>
+
         <!-- Main row with Condition Configuration Fields in Columns -->
         <b-row>
 
@@ -97,9 +111,21 @@
                 </b-col>
               </b-row>
               </div>
-              <b-button @click="addMatch" variant="success" size="sm">Add Match Group</b-button>
+              <b-button @click="addMatch" variant="success" size="sm" :style="{ marginRight: '10px'}">Add Match Group</b-button>
               <b-button @click="deleteMatch" variant="success" size="sm">Delete Match Group</b-button>
             </div>
+
+            <h4></h4>
+            <h4></h4>
+            <h4>Alert Choice</h4>
+
+            <!-- Select OCR Region -->
+            <b-form-group label="Alert">
+              <b-form-select
+              v-model="conditionsConfig.alert"
+              :options="conditionsList.alertRegions"
+              ></b-form-select>
+            </b-form-group>
           </b-col>
 
           <!-- Right column with  -->
@@ -108,7 +134,6 @@
 
             <!-- Dynamic Pixel Coordinates -->
             <div>
-              <h5>Pixel Conditions</h5>
               <div
               v-for="(coord, index) in conditionsConfig.pixelCoords"
               :key="`pixel-${index}`"
@@ -129,16 +154,10 @@
                 </b-col>
               </b-row>
               </div>
-              <b-button @click="addPixelCoord" variant="success" size="sm">Add Pixel</b-button>
-              <b-button @click="deletePixelCoord" variant="success" size="sm">Delete Pixel</b-button>
+              <b-button @click="addPixelCoord" variant="success" size="sm" :style="{ marginRight: '10px'}">Add Pixel</b-button>
+              <b-button @click="deletePixelCoord" variant="success" size="sm" >Delete Pixel</b-button>
             </div>
 
-            <!-- Toggle Overlay Button -->
-            <b-row class="mt-3">
-              <b-col cols="12" md="12">
-                <b-button @click="toggleGameModeOverlay">Toggle Game-mode Overlay</b-button>
-              </b-col>
-            </b-row>
           </b-col>
         </b-row>
       </b-col>
@@ -176,14 +195,22 @@
       const serializableConfig = toRaw(this.conditionsConfig);
       window.electronAPI.updateVariable('conditions', this.conditionsList.regionSelected, serializableConfig );
       this.conditionsList.regionSelected = newSelection;
-      window.electronAPI.updateVariable('conditions', 'selected', { regionSelected: newSelection });
+      window.electronAPI.updateVariable('conditions', 'selected', { regionSelected: this.conditionsList.regionSelected });
     },
     addRegion() {
       // Add a new OCR region to the list 
-      const newRegion = `pixelCoord${this.conditionsList.regions.length + 1}`;
+      const newRegion = `condition${this.conditionsList.regions.length + 1}`;
       this.conditionsList.regions.push(newRegion);
       // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
+    },
+    deleteRegion() {
+      if (this.conditionsList.regions.length > 1) {
+        const index = this.conditionsList.regions.findIndex(region => region === this.conditionsList.regionSelected);
+        this.conditionsList.regions.splice(index, 1);
+        const serializableRegions = toRaw(this.conditionsList);
+        window.electronAPI.updateVariable('conditions', 'selected', serializableRegions);
+      }  
     },
     addMatch() {
 	  // Add new match field

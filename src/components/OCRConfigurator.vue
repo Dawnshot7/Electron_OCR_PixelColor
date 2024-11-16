@@ -42,6 +42,10 @@
 
       <!-- All other content in component -->
       <b-col cols="9" md="9" class="image-region">
+        
+        <!-- Delete region button -->
+        <b-button @click="deleteRegion" variant="success" size="sm">Delete Region</b-button>
+
         <!-- Display unmodified image, modified image and OCR text in top Row -->
         <b-row class="align-items-center mb-3" style="height: 100px;">
 
@@ -106,7 +110,7 @@
             <!-- Button to start OCR region capture -->
             <b-row>
               <b-col cols="12" md="12">
-                <b-button @click="startCaptureBox">Start Coordinate Capture</b-button>
+                <b-button @click="startCaptureBox" variant="warning">Start Coordinate Capture</b-button>
               </b-col>
             </b-row>
 
@@ -178,6 +182,7 @@
 </template>
 
 <script>
+import { toRaw } from 'vue';
 export default {
   data() {
     return {
@@ -222,6 +227,7 @@ export default {
       // Change ocr box being displayed and have main.js send the new box's config data
       this.ocrList.regionSelected = newSelection;
       window.electronAPI.updateVariable('ocrRegions', 'selected', { regionSelected: newSelection });
+      window.electronAPI.updateVariable('ocrRegions', 'selected', { regions: this.ocrList.regions });
     },
     addRegion() {
       // Add a new OCR region to the list 
@@ -229,6 +235,14 @@ export default {
       this.ocrList.regions.push(newRegion);
       // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
+    },
+    deleteRegion() {
+      if (this.ocrList.regions.length > 1) {
+        const index = this.ocrList.regions.findIndex(region => region === this.ocrList.regionSelected);
+        this.ocrList.regions.splice(index, 1);
+        const serializableRegions = toRaw(this.ocrList);
+        window.electronAPI.updateVariable('ocrRegions', 'selected', serializableRegions);
+      }   
     },
     toggleLive() {
       // Turns on/off OCR being performed in setinterval in main.js and result sent back every second 

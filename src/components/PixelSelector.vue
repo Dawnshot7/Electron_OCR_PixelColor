@@ -46,8 +46,11 @@
         <!-- Main row with Pixel Configuration Fields in Columns -->
         <b-row>
 
+        <!-- Delete region button -->
+
           <!-- Left column with box position, capture coords, show overlay, rename, new region, delete region -->
           <b-col cols="4" md="4">
+            <b-button @click="deleteRegion" variant="success" size="sm">Delete Region</b-button>
 
             <!-- Position Fields -->
             <b-row class="mt-3">
@@ -74,7 +77,7 @@
             <!-- Button to start OCR region capture -->
             <b-row class="mt-3">
               <div class="container mt-4">
-                <b-button @click="startCapturePixel">Start Coordinate Capture</b-button>
+                <b-button @click="startCapturePixel" variant="warning">Start Coordinate Capture</b-button>
               </div>
             </b-row>
           </b-col>
@@ -108,7 +111,8 @@
 </template>
 
 <script>
-  export default {
+import { toRaw } from 'vue';
+export default {
   data() {
     return {
       pixelList: {
@@ -134,6 +138,7 @@
       // Change ocr box being displayed and have main.js send the new box's config data
       this.pixelList.regionSelected = newSelection;
       window.electronAPI.updateVariable('pixelCoords', 'selected', { regionSelected: newSelection });
+      window.electronAPI.updateVariable('pixelCoords', 'selected', { regions: this.pixelList.regions });
     },
     addRegion() {
       // Add a new OCR region to the list 
@@ -141,6 +146,15 @@
       this.pixelList.regions.push(newRegion);
       // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
+    },
+    deleteRegion() {
+      if (this.pixelList.regions.length > 1) {
+        const index = this.pixelList.regions.findIndex(region => region === this.pixelList.regionSelected);
+        this.pixelList.regions.splice(index, 1);
+        console.log(`pixel regions: ${this.pixelList.regions}, selection: ${this.pixelList.regionSelected}`)
+        const serializableRegions = toRaw(this.pixelList);
+        window.electronAPI.updateVariable('pixelCoords', 'selected', serializableRegions);
+      }  
     },
     toggleLive() {
       // Turns on/off OCR being performed in setinterval in main.js and result sent back every second 
