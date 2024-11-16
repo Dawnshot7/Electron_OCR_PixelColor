@@ -43,94 +43,12 @@
       <!-- All other content in component -->
       <b-col cols="9" md="9" class="image-region"> 
 
-        <!-- Top row with delete, rename region, toggle overlay -->
-        <b-row class="mt-3">
-
-          <b-col cols="6" md="6">
-            <!-- Delete region button -->
-            <b-button @click="deleteRegion" variant="success" size="sm">Delete Region</b-button>
-          </b-col>
-          <b-col cols="6" md="6">
-            <!-- Toggle overlay button -->
-            <b-button @click="toggleGameModeOverlay" variant="warning">Toggle Game-mode Overlay</b-button>
-          </b-col>
-
-        </b-row>
-
         <!-- Main row with Condition Configuration Fields in Columns -->
         <b-row>
 
-          <!-- Left column with  -->
+          <!-- LEft column with  -->
           <b-col cols="6" md="6">
-            <h4>OCR Configuration</h4>
-
-            <!-- Select OCR Region -->
-            <b-form-group label="OCR Region">
-              <b-form-select
-              v-model="conditionsConfig.ocrRegions"
-              :options="conditionsList.ocrRegions"
-              ></b-form-select>
-            </b-form-group>
-
-            <!-- Regex Input -->
-            <b-form-group label="Regex Pattern">
-              <b-form-input v-model="conditionsConfig.regex" placeholder="(.*)"></b-form-input>
-            </b-form-group>
-
-            <!-- Matches (Dynamic Fields) -->
-            <div>
-              <h5>Matches</h5>
-              <div
-              v-for="(match, index) in conditionsConfig.matches"
-              :key="`match-${index}`"
-              class="mb-2"
-              >
-              <b-row>
-                <b-col cols="4">
-                <b-form-select
-                  v-model="match[0]"
-                  :options="['equals', 'notEquals', 'lessThan', 'greaterThan', 'between']"
-                ></b-form-select>
-                </b-col>
-                <b-col cols="4">
-                <b-form-input
-                  v-model="match[1]"
-                  placeholder="value"
-                ></b-form-input>
-                </b-col>
-                <b-col cols="4">
-                  <div
-                  v-if="match[0] === 'between'"
-                  class="mb-2"
-                  >
-                  <b-form-input
-                    v-model="match[2]"
-                    placeholder="value"
-                  ></b-form-input>
-                </div>
-                </b-col>
-              </b-row>
-              </div>
-              <b-button @click="addMatch" variant="success" size="sm" :style="{ marginRight: '10px'}">Add Match Group</b-button>
-              <b-button @click="deleteMatch" variant="success" size="sm">Delete Match Group</b-button>
-            </div>
-
-            <h4></h4>
-            <h4></h4>
-            <h4>Alert Choice</h4>
-
-            <!-- Select OCR Region -->
-            <b-form-group label="Alert">
-              <b-form-select
-              v-model="conditionsConfig.alert"
-              :options="conditionsList.alertRegions"
-              ></b-form-select>
-            </b-form-group>
-          </b-col>
-
-          <!-- Right column with  -->
-          <b-col cols="6" md="6">
-            <h4>Pixel Configuration</h4>
+            <h4>Pixel Conditions</h4>
 
             <!-- Dynamic Pixel Coordinates -->
             <div>
@@ -155,10 +73,99 @@
               </b-row>
               </div>
               <b-button @click="addPixelCoord" variant="success" size="sm" :style="{ marginRight: '10px'}">Add Pixel</b-button>
-              <b-button @click="deletePixelCoord" variant="success" size="sm" >Delete Pixel</b-button>
+              <b-button @click="deletePixelCoord" variant="success" size="sm" >Remove Pixel</b-button>
             </div>
 
+            
+            <b-row>
+              <b-col cols="8" md="8">
+
+                <!-- Toggle overlay button -->
+                <b-row>
+                  <b-button @click="toggleGameModeOverlay" variant="warning" :style="{ marginTop: '20px' }">Toggle Game-mode Overlay</b-button>
+                </b-row>
+                
+                <!-- Delete region button -->
+                <b-row>
+                  <b-button @click="deleteRegion" variant="danger" size="sm" :style="{ marginTop: '20px' }">Delete Region</b-button>
+                </b-row>
+
+              </b-col>
+            </b-row>
           </b-col>
+
+          <!-- Right column with  -->
+          <b-col cols="6" md="6">
+
+            <!-- Toggle visibility of OCR conditions  -->
+            <h4>OCR Conditions</h4>
+            <b-button @click="conditionsConfig.ocrRegions = conditionsList.ocrRegions[0]" variant="success" size="sm" :style="{ marginRight: '10px'}">Add OCR</b-button>
+            <b-button @click="conditionsConfig.ocrRegions = ''" variant="success" size="sm">Remove OCR</b-button>
+            <div v-if="conditionsConfig.ocrRegions !== ''">
+
+              <!-- Select OCR Region -->
+              <b-form-group label="OCR Region">
+                <b-form-select
+                v-model="conditionsConfig.ocrRegions"
+                :options="conditionsList.ocrRegions"
+                ></b-form-select>
+              </b-form-group>
+
+              <!-- Regex Input -->
+              <b-form-group label="Regex Pattern">
+                <b-form-input v-model="conditionsConfig.regex" placeholder=""></b-form-input>
+              </b-form-group>
+
+              <!-- Matches (Dynamic Fields) -->
+              <div>
+                <h5>Matches</h5>
+                <div
+                v-for="(match, index) in conditionsConfig.matches"
+                :key="`match-${index}`"
+                class="mb-2"
+                >
+                <b-row>
+                  <b-col cols="4">
+                  <b-form-select
+                    v-model="match[0]"
+                    :options="['equals', 'notEquals', 'lessThan', 'greaterThan', 'between']"
+                  ></b-form-select>
+                  </b-col>
+                  <b-col cols="4">
+                  <b-form-input
+                    v-model="match[1]"
+                    placeholder="value"
+                  ></b-form-input>
+                  </b-col>
+                  <b-col cols="4">
+                    <div
+                    v-if="match[0] === 'between'"
+                    class="mb-2"
+                    >
+                    <b-form-input
+                      v-model="match[2]"
+                      placeholder="value"
+                    ></b-form-input>
+                  </div>
+                  </b-col>
+                </b-row>
+                </div>
+                <b-button @click="addMatch" variant="success" size="sm" :style="{ marginRight: '10px'}">Add Match Group</b-button>
+                <b-button @click="deleteMatch" variant="success" size="sm">Remove Match Group</b-button>
+              </div>
+            </div>
+
+            <h4 :style="{ marginTop: '20px' }">Alert Choice</h4>
+
+            <!-- Select OCR Region -->
+            <b-form-group label="Alert">
+              <b-form-select
+              v-model="conditionsConfig.alert"
+              :options="conditionsList.alertRegions"
+              ></b-form-select>
+            </b-form-group>
+          </b-col>
+
         </b-row>
       </b-col>
     </b-row>

@@ -45,12 +45,20 @@
         
         <!-- Main row with Pixel Configuration Fields in Columns -->
         <b-row>
-
-        <!-- Delete region button -->
-
+       
           <!-- Left column with box position, capture coords, show overlay, rename, new region, delete region -->
           <b-col cols="4" md="4">
-            <b-button @click="deleteRegion" variant="success" size="sm">Delete Region</b-button>
+
+            <!-- Display pixel color and OCR text -->
+            <b-row class="align-items-center justify-content-center mb-3" style="height: 116px;">
+              <div 
+                id="color-info" 
+                class="mt-1 pixelText" 
+                :style="{ color: pixelConfig.color }"
+              >
+                {{ colorInfo }}
+              </div>
+            </b-row>
 
             <!-- Position Fields -->
             <b-row class="mt-3">
@@ -75,35 +83,17 @@
             </b-row>
 
             <!-- Button to start OCR region capture -->
-            <b-row class="mt-3">
-              <div class="container mt-4">
-                <b-button @click="startCapturePixel" variant="warning">Start Coordinate Capture</b-button>
-              </div>
-            </b-row>
-          </b-col>
-
-          <!-- Second column with pixel color and replace color button-->
-          <b-col cols="4" md="4">
-
-            <!-- Display pixel color and OCR text -->
-            <b-row class="mt-3">
-              <div 
-                id="color-info" 
-                class="mt-1 pixelText" 
-                :style="{ color: pixelConfig.color }"
-              >
-                {{ colorInfo }}
-              </div>
+            <b-row>
+                <b-button @click="startCapturePixel" variant="warning" :style="{ marginTop: '20px' }">Start Coordinate Capture</b-button>
             </b-row>
 
-            <!-- Live pixel color checkbox -->
-            <b-row class="mt-3">
-              <div class="d-flex justify-content-center">
-                <b-form-checkbox v-model="pixelList.live" @change="toggleLive">Live pixel color</b-form-checkbox>
-              </div>
+            <!-- Delete region button -->
+            <b-row>
+              <b-button @click="deleteRegion" variant="danger" size="sm" :style="{ marginTop: '20px' }">Delete Region</b-button>
             </b-row>
 
           </b-col>
+
         </b-row>
       </b-col>
     </b-row>
@@ -204,5 +194,11 @@ export default {
 
 .pixel-btn {
   font-weight: bold; /* Force bold text */
+}
+
+.fixed-width-input {
+  width: 5ch; /* Makes input wide enough for 3 characters */
+  padding: 0; /* Removes all padding */
+  text-align: center;
 }
 </style>

@@ -43,11 +43,8 @@
       <!-- All other content in component -->
       <b-col cols="9" md="9" class="image-region">
         
-        <!-- Delete region button -->
-        <b-button @click="deleteRegion" variant="success" size="sm">Delete Region</b-button>
-
         <!-- Display unmodified image, modified image and OCR text in top Row -->
-        <b-row class="align-items-center mb-3" style="height: 100px;">
+        <b-row class="align-items-center justify-content-center mb-3" style="height: 100px;">
 
           <!-- Images Side by Side -->
           <b-col cols="4" md="4">
@@ -109,9 +106,12 @@
             
             <!-- Button to start OCR region capture -->
             <b-row>
-              <b-col cols="12" md="12">
-                <b-button @click="startCaptureBox" variant="warning">Start Coordinate Capture</b-button>
-              </b-col>
+              <b-button @click="startCaptureBox" variant="warning" :style="{ marginTop: '20px' }">Start Coordinate Capture</b-button>
+            </b-row>
+
+            <!-- Delete region button -->
+            <b-row>
+              <b-button @click="deleteRegion" variant="danger" size="sm" :style="{ marginTop: '20px' }">Delete Region</b-button>
             </b-row>
 
             <!-- Button to show current ocr box on overlay -->

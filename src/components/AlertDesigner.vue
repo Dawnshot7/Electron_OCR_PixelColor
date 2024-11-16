@@ -37,14 +37,11 @@
       <!-- Main column with Alert Configuration Fields -->
       <b-col cols="9" md="9">
         
-        <!-- Delete region button -->
-        <b-button @click="deleteRegion" variant="success" size="sm">Delete Region</b-button>
-
         <!-- Alert Preview -->
         <b-row class="align-items-center mb-3">
           <div 
             class="d-flex justify-content-center align-items-center" 
-            :style="{ whiteSpace: 'nowrap', overflow: 'hidden', height: '175px', color: alertsConfig.color, fontSize: alertsConfig.textSize + 'px' }"
+            :style="{ whiteSpace: 'nowrap', overflow: 'hidden', height: '100px', color: alertsConfig.color, fontSize: alertsConfig.textSize + 'px' }"
             >{{ alertsConfig.content }}
           </div>
         </b-row>
@@ -63,10 +60,13 @@
             </b-row>
             
             <!-- Toggle Overlay Button -->
-            <b-row class="mt-3">
-              <b-col cols="12" md="12">
-                <b-button @click="showDraggableOverlay" variant="warning">View and Move Alerts</b-button>
-              </b-col>
+            <b-row>
+                <b-button @click="showDraggableOverlay" variant="warning" :style="{ marginTop: '20px' }">View and Move Alerts</b-button>
+            </b-row>
+
+            <!-- Delete region button -->
+            <b-row>
+              <b-button @click="deleteRegion" variant="danger" size="sm" :style="{ marginTop: '20px' }">Delete Region</b-button>
             </b-row>
           </b-col>
 
@@ -75,8 +75,10 @@
             <!-- Alert Text Editbox -->
             <b-row class="mt-3">
               <b-form-group label="Alert Text" label-for="alertText">
-                <b-form-input id="alertText" v-model="alertsConfig.content" placeholder="Enter alert text"></b-form-input>
-                <b-button @click="updateAlertText(alertsConfig.content)" variant="success">Submit</b-button>
+                <div class="d-flex align-items-center">
+                  <b-form-input id="alertText" v-model="alertsConfig.content" placeholder="Enter alert text"></b-form-input>
+                  <b-button @click="updateAlertText(alertsConfig.content)" variant="success">Submit</b-button>
+                </div>
               </b-form-group>
             </b-row>
 
