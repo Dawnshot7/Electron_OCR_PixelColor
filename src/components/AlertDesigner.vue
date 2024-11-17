@@ -2,28 +2,25 @@
   <div class="container mt-4">
     <h1 class="mb-3">Alert Designer</h1>
     <b-row>
-
-      <!-- Left Column with Listbox of alerts -->
+      <!-- Left Column with Listbox of Pixel Regions -->
       <b-col cols="3" md="3" style="min-width: 200px;">
-        <div class="list-group">
+        <div 
+          class="list-group listbox-container" 
+          style="max-height: 460px; overflow-y: auto;"
+        >
+          <!-- Render active OCR region buttons -->
           <button
             v-for="region in alertsList.regions"
             :key="region"
             @click="regionChange(region)"
-            :class="['list-group-item', { active: region === alertsList.regionSelected }, 'text-center', 'alert-btn']"
+            :class="['list-group-item', { active: region === alertsList.regionSelected }, 'text-center', 'bold-btn']"
           >
             {{ region }}
           </button>
+
+          <!-- Render "empty" placeholders for remaining slots up to 12 -->
           <button
-            v-if="alertsList.regions.length < 15"
-            @click="addRegion()"
-            class="list-group-item list-group-item-action text-center add-region-btn bg-light"
-            style="background-color: #797979;"
-          >
-            Add Region
-          </button>
-          <button
-            v-for="index in 15 - alertsList.regions.length - 1"
+            v-for="index in Math.max(0, 11 - alertsList.regions.length)"
             :key="'empty-' + index"
             class="list-group-item text-center empty-btn"
             style="background-color: #d3d3d3;"
@@ -32,6 +29,24 @@
             Empty
           </button>
         </div>
+
+        <!-- Render the "Add Region" button always visible below the list -->
+        <button
+          @click="addRegion"
+          class="list-group-item list-group-item-action text-center add-region-btn bold-btn bg-light mt-2"
+          style="background-color: #797979; width: 100%;"
+        >
+          Add Region
+        </button>
+
+        <!-- Render the "Delete Region" button always visible below the list -->
+        <button
+          @click="deleteRegion"
+          class="list-group-item list-group-item-action text-center delete-region-btn bold-btn mt-2"
+          style="margin-top: 25px; background-color: #dc3545; width: 100%;"
+        >
+          Delete Region
+        </button>
       </b-col>
 
       <!-- Main column with Alert Configuration Fields -->
@@ -49,7 +64,7 @@
         <!-- Alert Configuration Fields -->
         <b-row class="mt-3">
           <!-- Left column: Position Controls, Overlay Toggle -->
-          <b-col cols="4" md="4">
+          <b-col cols="6" md="6">
             <b-row class="mt-3">
               <div class="d-flex justify-content-center">
                 <label for="input-x">  X:</label>
@@ -60,18 +75,14 @@
             </b-row>
             
             <!-- Toggle Overlay Button -->
-            <b-row>
-                <b-button @click="showDraggableOverlay" variant="warning" :style="{ marginTop: '20px' }">View and Move Alerts</b-button>
+            <b-row class="d-flex justify-content-center">
+                <b-button @click="showDraggableOverlay" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">View and Move Alerts</b-button>
             </b-row>
 
-            <!-- Delete region button -->
-            <b-row>
-              <b-button @click="deleteRegion" variant="danger" size="sm" :style="{ marginTop: '20px' }">Delete Region</b-button>
-            </b-row>
           </b-col>
 
           <!-- Middle column: Text, Font Size, and Color -->
-          <b-col cols="4" md="4">
+          <b-col cols="6" md="6">
             <!-- Alert Text Editbox -->
             <b-row class="mt-3">
               <b-form-group label="Alert Text" label-for="alertText">
@@ -145,8 +156,14 @@ export default {
       window.electronAPI.updateVariable('alerts', 'selected', { regions: this.alertsList.regions });
     },
     addRegion() {
-      const newRegion = `alert${this.alertsList.regions.length + 1}`;
+      // Add a new OCR region to the list 
+      let lastNumber = 0;
+      const lastItemName = this.alertsList.regions[this.alertsList.regions.length - 1];
+      const match = lastItemName.match(/(\d+)$/);
+      lastNumber = parseInt(match[1], 10);
+      const newRegion = `alert${lastNumber + 1}`;
       this.alertsList.regions.push(newRegion);
+      // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
     },
     deleteRegion() {
@@ -192,7 +209,7 @@ export default {
 
 <style scoped>
 .fixed-width-input {
-  width: 5ch; /* Makes input wide enough for 3 characters */
+  width: 7ch; /* Makes input wide enough for 3 characters */
   padding: 0; /* Removes all padding */
   text-align: center;
 }
@@ -202,7 +219,7 @@ export default {
   height: auto;
 }
 
-.alert-btn {
+.bold-btn {
   font-weight: bold; /* Force bold text */
 }
 </style>

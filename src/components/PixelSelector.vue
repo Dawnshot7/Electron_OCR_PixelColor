@@ -3,33 +3,25 @@
     <h1 class="mb-3">Pixel Selector</h1>
     <b-row>
 
-    <!-- Left Column with Listbox of OCR Regions -->
+      <!-- Left Column with Listbox of Pixel Regions -->
       <b-col cols="3" md="3" style="min-width: 200px;">
-        <div class="list-group">
-
+        <div 
+          class="list-group listbox-container" 
+          style="max-height: 460px; overflow-y: auto;"
+        >
           <!-- Render active OCR region buttons -->
           <button
             v-for="region in pixelList.regions"
             :key="region"
             @click="regionChange(region)"
-            :class="['list-group-item', { active: region === pixelList.regionSelected }, 'text-center', 'pixel-btn']"
+            :class="['list-group-item', { active: region === pixelList.regionSelected }, 'text-center', 'bold-btn']"
           >
             {{ region }}
           </button>
 
-          <!-- Render the "Add Region" button in the next available slot -->
+          <!-- Render "empty" placeholders for remaining slots up to 12 -->
           <button
-            v-if="pixelList.regions.length < 15"
-            @click="addRegion()"
-            class="list-group-item list-group-item-action text-center add-region-btn bg-light"
-            style="background-color: #797979;"
-          >
-            Add Region
-          </button>
-
-          <!-- Render "empty" placeholders for remaining slots up to 15 -->
-          <button
-            v-for="index in 15 - pixelList.regions.length - 1"
+            v-for="index in Math.max(0, 11 - pixelList.regions.length)"
             :key="'empty-' + index"
             class="list-group-item text-center empty-btn"
             style="background-color: #d3d3d3;"
@@ -38,6 +30,24 @@
             Empty
           </button>
         </div>
+
+        <!-- Render the "Add Region" button always visible below the list -->
+        <button
+          @click="addRegion"
+          class="list-group-item list-group-item-action text-center add-region-btn bold-btn bg-light mt-2"
+          style="background-color: #797979; width: 100%;"
+        >
+          Add Region
+        </button>
+
+        <!-- Render the "Delete Region" button always visible below the list -->
+        <button
+          @click="deleteRegion"
+          class="list-group-item list-group-item-action text-center delete-region-btn bold-btn mt-2"
+          style="margin-top: 25px; background-color: #dc3545; width: 100%;"
+        >
+          Delete Region
+        </button>
       </b-col>
 
       <!-- All other content in component -->
@@ -47,16 +57,12 @@
         <b-row>
        
           <!-- Left column with box position, capture coords, show overlay, rename, new region, delete region -->
-          <b-col cols="4" md="4">
+          <b-col cols="6" md="6">
 
-            <!-- Display pixel color and OCR text -->
+            <!-- Image of pixel location -->
             <b-row class="align-items-center justify-content-center mb-3" style="height: 116px;">
-              <div 
-                id="color-info" 
-                class="mt-1 pixelText" 
-                :style="{ color: pixelConfig.color }"
-              >
-                {{ colorInfo }}
+              <div class="d-flex justify-content-center">
+                <b-img id='pixelImage' src='' alt="Pixel Image" class="img-fluid" ></b-img>
               </div>
             </b-row>
 
@@ -83,17 +89,31 @@
             </b-row>
 
             <!-- Button to start OCR region capture -->
-            <b-row>
-                <b-button @click="startCapturePixel" variant="warning" :style="{ marginTop: '20px' }">Start Coordinate Capture</b-button>
-            </b-row>
-
-            <!-- Delete region button -->
-            <b-row>
-              <b-button @click="deleteRegion" variant="danger" size="sm" :style="{ marginTop: '20px' }">Delete Region</b-button>
+            <b-row class="d-flex justify-content-center">
+                <b-button @click="startCapturePixel" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Start Coordinate Capture</b-button>
             </b-row>
 
           </b-col>
 
+          <b-col cols="6" md="6">
+
+            <!-- Pixel color  -->
+            <div 
+                id="color-info" 
+                class="mt-1 pixelText" 
+                :style="{ color: pixelConfig.liveColor }"
+                v-html="colorInfo"
+              >
+            </div>
+
+            <!-- Live pixel color checkbox -->
+            <b-row class="mt-3">
+              <div class="d-flex justify-content-center">
+                <b-form-checkbox v-model="pixelList.live" @change="toggleLive">Live pixel color</b-form-checkbox>
+              </div>
+            </b-row>
+
+          </b-col>
         </b-row>
       </b-col>
     </b-row>
@@ -115,7 +135,8 @@ export default {
       pixelConfig: {
         x: 0,
         y: 0,
-        color: '000000'
+        color: '000000',
+        liveColor: '000000'
       },
     };
   },
@@ -132,7 +153,11 @@ export default {
     },
     addRegion() {
       // Add a new OCR region to the list 
-      const newRegion = `pixelCoord${this.pixelList.regions.length + 1}`;
+      let lastNumber = 0;
+      const lastItemName = this.pixelList.regions[this.pixelList.regions.length - 1];
+      const match = lastItemName.match(/(\d+)$/);
+      lastNumber = parseInt(match[1], 10);
+      const newRegion = `pixel${lastNumber + 1}`;
       this.pixelList.regions.push(newRegion);
       // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
@@ -163,6 +188,7 @@ export default {
         this.pixelConfig = { ...this.pixelConfig, ...selectedValues };
         console.log(`received config`, selectedValues.color);
         this.colorInfo = `Color at (${this.pixelConfig.x}, ${this.pixelConfig.y}): ${this.pixelConfig.color}`;
+        this.pixelConfig.liveColor = this.pixelConfig.color;
       }
     });
 
@@ -176,13 +202,20 @@ export default {
     }); 
 
     // Listen for updates to populate the list box on component load
-    window.electronAPI.onpixelColor(({ selectedList }) => {
-      if (selectedList) {
+    window.electronAPI.onpixelColor(({ liveColor }) => {
+      if (liveColor) {
         // Populate fields from selectedValues
-        this.pixelConfig = { ...this.pixelConfig, ...selectedList };
-        console.log('received color');
+        this.pixelConfig.liveColor = `#${liveColor}`;
+        const match = (this.pixelConfig.liveColor === this.pixelConfig.color);
+        this.colorInfo = `Color at (${this.pixelConfig.x}, ${this.pixelConfig.y}): ${this.pixelConfig.liveColor}<br>Match status: ${match}`;
       }
     }); 
+
+    // Listen for the images message
+    window.electronAPI.onupdatePixelImages(({ imageData }) => {
+      const unmodifiedBlob = new Blob([imageData], { type: 'image/png' });
+      document.getElementById('pixelImage').src = URL.createObjectURL(unmodifiedBlob);
+    });
   },
 };
 </script>
@@ -192,13 +225,14 @@ export default {
   font-weight: bold;
 }
 
-.pixel-btn {
-  font-weight: bold; /* Force bold text */
-}
-
 .fixed-width-input {
-  width: 5ch; /* Makes input wide enough for 3 characters */
+  width: 7ch; /* Makes input wide enough for 3 characters */
   padding: 0; /* Removes all padding */
   text-align: center;
 }
+
+.bold-btn {
+  font-weight: bold; /* Force bold text */
+}
+
 </style>

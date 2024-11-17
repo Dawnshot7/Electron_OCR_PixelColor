@@ -3,33 +3,25 @@
     <h1 class="mb-3">Conditions Builder</h1>
     <b-row>
 
-    <!-- Left Column with Listbox of OCR Regions -->
+      <!-- Left Column with Listbox of Pixel Regions -->
       <b-col cols="3" md="3" style="min-width: 200px;">
-        <div class="list-group">
-
+        <div 
+          class="list-group listbox-container" 
+          style="max-height: 460px; overflow-y: auto;"
+        >
           <!-- Render active OCR region buttons -->
           <button
             v-for="region in conditionsList.regions"
             :key="region"
             @click="regionChange(region)"
-            :class="['list-group-item', { active: region === conditionsList.regionSelected }, 'text-center', 'pixel-btn']"
+            :class="['list-group-item', { active: region === conditionsList.regionSelected }, 'text-center', 'bold-btn']"
           >
             {{ region }}
           </button>
 
-          <!-- Render the "Add Region" button in the next available slot -->
+          <!-- Render "empty" placeholders for remaining slots up to 12 -->
           <button
-            v-if="conditionsList.regions.length < 15"
-            @click="addRegion()"
-            class="list-group-item list-group-item-action text-center add-region-btn bg-light"
-            style="background-color: #797979;"
-          >
-            Add Region
-          </button>
-
-          <!-- Render "empty" placeholders for remaining slots up to 15 -->
-          <button
-            v-for="index in 15 - conditionsList.regions.length - 1"
+            v-for="index in Math.max(0, 11 - conditionsList.regions.length)"
             :key="'empty-' + index"
             class="list-group-item text-center empty-btn"
             style="background-color: #d3d3d3;"
@@ -38,6 +30,24 @@
             Empty
           </button>
         </div>
+
+        <!-- Render the "Add Region" button always visible below the list -->
+        <button
+          @click="addRegion"
+          class="list-group-item list-group-item-action text-center add-region-btn bold-btn bg-light mt-2"
+          style="background-color: #797979; width: 100%;"
+        >
+          Add Region
+        </button>
+
+        <!-- Render the "Delete Region" button always visible below the list -->
+        <button
+          @click="deleteRegion"
+          class="list-group-item list-group-item-action text-center delete-region-btn bold-btn mt-2"
+          style="margin-top: 25px; background-color: #dc3545; width: 100%;"
+        >
+          Delete Region
+        </button>
       </b-col>
 
       <!-- All other content in component -->
@@ -72,22 +82,19 @@
                 </b-col>
               </b-row>
               </div>
+
+              <!-- Add and delete pixel buttons -->
               <b-button @click="addPixelCoord" variant="success" size="sm" :style="{ marginRight: '10px'}">Add Pixel</b-button>
               <b-button @click="deletePixelCoord" variant="success" size="sm" >Remove Pixel</b-button>
             </div>
 
             
             <b-row>
-              <b-col cols="8" md="8">
+              <b-col cols="12" md="12">
 
                 <!-- Toggle overlay button -->
-                <b-row>
-                  <b-button @click="toggleGameModeOverlay" variant="warning" :style="{ marginTop: '20px' }">Toggle Game-mode Overlay</b-button>
-                </b-row>
-                
-                <!-- Delete region button -->
-                <b-row>
-                  <b-button @click="deleteRegion" variant="danger" size="sm" :style="{ marginTop: '20px' }">Delete Region</b-button>
+                <b-row class="d-flex justify-content-center">
+                  <b-button @click="toggleGameModeOverlay" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Toggle Game-mode Overlay</b-button>
                 </b-row>
 
               </b-col>
@@ -118,7 +125,7 @@
 
               <!-- Matches (Dynamic Fields) -->
               <div>
-                <h5>Matches</h5>
+                <h5>Matches (no backslashes)</h5>
                 <div
                 v-for="(match, index) in conditionsConfig.matches"
                 :key="`match-${index}`"
@@ -190,7 +197,7 @@
         ocrRegions: '',
         regex: '',
         matches: [],
-        pixelCoords: ['pixelCoord1'],
+        pixelCoords: [''],
         pixelComparison: [],
         alert: ''
       },
@@ -206,7 +213,11 @@
     },
     addRegion() {
       // Add a new OCR region to the list 
-      const newRegion = `condition${this.conditionsList.regions.length + 1}`;
+      let lastNumber = 0;
+      const lastItemName = this.conditionsList.regions[this.conditionsList.regions.length - 1];
+      const match = lastItemName.match(/(\d+)$/);
+      lastNumber = parseInt(match[1], 10);
+      const newRegion = `condition${lastNumber + 1}`;
       this.conditionsList.regions.push(newRegion);
       // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
@@ -221,7 +232,7 @@
     },
     addMatch() {
 	  // Add new match field
-      this.conditionsConfig.matches.push({ value: '', comparison: '' });
+      this.conditionsConfig.matches.push(['','','']);
     },
     deleteMatch() {
 	  // Delete bottom match field
@@ -277,7 +288,7 @@
   font-weight: bold;
 }
 
-.pixel-btn {
+.bold-btn {
   font-weight: bold; /* Force bold text */
 }
 </style>

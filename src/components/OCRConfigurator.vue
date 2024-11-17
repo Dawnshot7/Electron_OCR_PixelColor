@@ -3,32 +3,25 @@
     <h1 class="mb-3">OCR Configurator</h1>
     <b-row>
 
-      <!-- Left Column with Listbox of OCR Regions -->
+      <!-- Left Column with Listbox of Pixel Regions -->
       <b-col cols="3" md="3" style="min-width: 200px;">
-        <div class="list-group">
+        <div 
+          class="list-group listbox-container" 
+          style="max-height: 460px; overflow-y: auto;"
+        >
           <!-- Render active OCR region buttons -->
           <button
             v-for="region in ocrList.regions"
             :key="region"
             @click="regionChange(region)"
-            :class="['list-group-item', { active: region === ocrList.regionSelected }, 'text-center', 'ocr-btn']"
+            :class="['list-group-item', { active: region === ocrList.regionSelected }, 'text-center', 'bold-btn']"
           >
             {{ region }}
           </button>
 
-          <!-- Render the "Add Region" button in the next available slot -->
+          <!-- Render "empty" placeholders for remaining slots up to 12 -->
           <button
-            v-if="ocrList.regions.length < 15"
-            @click="addRegion()"
-            class="list-group-item list-group-item-action text-center add-region-btn bg-light"
-            style="background-color: #797979;"
-          >
-            Add Region
-          </button>
-
-          <!-- Render "empty" placeholders for remaining slots up to 15 -->
-          <button
-            v-for="index in 15 - ocrList.regions.length - 1"
+            v-for="index in Math.max(0, 11 - ocrList.regions.length)"
             :key="'empty-' + index"
             class="list-group-item text-center empty-btn"
             style="background-color: #d3d3d3;"
@@ -37,7 +30,26 @@
             Empty
           </button>
         </div>
+
+        <!-- Render the "Add Region" button always visible below the list -->
+        <button
+          @click="addRegion"
+          class="list-group-item list-group-item-action text-center add-region-btn bold-btn bg-light mt-2"
+          style="background-color: #797979; width: 100%;"
+        >
+          Add Region
+        </button>
+
+        <!-- Render the "Delete Region" button always visible below the list -->
+        <button
+          @click="deleteRegion"
+          class="list-group-item list-group-item-action text-center delete-region-btn bold-btn mt-2"
+          style="margin-top: 25px; background-color: #dc3545; width: 100%;"
+        >
+          Delete Region
+        </button>
       </b-col>
+
 
 
       <!-- All other content in component -->
@@ -47,24 +59,24 @@
         <b-row class="align-items-center justify-content-center mb-3" style="height: 100px;">
 
           <!-- Images Side by Side -->
-          <b-col cols="4" md="4">
-            <b-img id='unmodifiedImage' src='' alt="Unmodified Image" class="img-fluid" ></b-img>
+          <b-col cols="6" md="6">
+            <div class="d-flex justify-content-center">
+              <b-img id='unmodifiedImage' src='' alt="Unmodified Image" class="img-fluid" ></b-img>
+            </div>
           </b-col>
-          <b-col cols="4" md="4">
-            <b-img id='modifiedImage' src='' alt="Modified Image" class="img-fluid" ></b-img>
+          <b-col cols="6" md="6">
+            <div class="d-flex justify-content-center">
+              <b-img id='modifiedImage' src='' alt="Modified Image" class="img-fluid" ></b-img>
+            </div>
           </b-col>
 
-          <!-- OCR Text -->
-          <b-col cols="4" md="4">
-            <div id="ocrText" class="p-2">{{ ocrText }}</div>
-          </b-col>
         </b-row>
          
         <!-- Bottom row with OCR Configuration Fields in Columns -->
         <b-row>
 
           <!-- Left column with box position, capture coords, show overlay, rename, new region, delete region -->
-          <b-col cols="4" md="4">
+          <b-col cols="6" md="6">
 
             <!-- Position Fields -->
             <b-row class="mt-3">
@@ -105,13 +117,8 @@
             </b-row>
             
             <!-- Button to start OCR region capture -->
-            <b-row>
-              <b-button @click="startCaptureBox" variant="warning" :style="{ marginTop: '20px' }">Start Coordinate Capture</b-button>
-            </b-row>
-
-            <!-- Delete region button -->
-            <b-row>
-              <b-button @click="deleteRegion" variant="danger" size="sm" :style="{ marginTop: '20px' }">Delete Region</b-button>
+            <b-row class="d-flex justify-content-center">
+              <b-button @click="startCaptureBox" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Start Coordinate Capture</b-button>
             </b-row>
 
             <!-- Button to show current ocr box on overlay -->
@@ -121,8 +128,20 @@
           </b-col>
 
            <!-- Middle column with image modification fields (Invert, brightness, contrast) -->
-          <b-col cols="4" md="4">
+          <b-col cols="6" md="6">
             
+            <!-- OCR Text -->
+            <b-row class="mt-3">
+              <div id="ocrText" class="p-2">{{ ocrText }}</div>
+            </b-row>
+
+            <!-- Live OCR text checkbox -->
+            <b-row class="mt-3">
+              <div class="d-flex justify-content-center">
+                <b-form-checkbox v-model="ocrList.live" @change="toggleLive">Live OCR text</b-form-checkbox>
+              </div>
+            </b-row>
+
             <!-- Invert Checkbox -->
             <b-row class="mt-3">
               <div class="d-flex justify-content-center">
@@ -164,17 +183,6 @@
             
           </b-col>
 
-          <!-- Third column for toggle live OCR -->
-          <b-col cols="4" md="4">
-
-            <!-- Live OCR text checkbox -->
-            <b-row class="mt-3">
-              <div class="d-flex justify-content-center">
-                <b-form-checkbox v-model="ocrList.live" @change="toggleLive">Live OCR text</b-form-checkbox>
-              </div>
-            </b-row>
- 
-          </b-col>
         </b-row>
       </b-col>
     </b-row>
@@ -231,7 +239,11 @@ export default {
     },
     addRegion() {
       // Add a new OCR region to the list 
-      const newRegion = `ocrRegion${this.ocrList.regions.length + 1}`;
+      let lastNumber = 0;
+      const lastItemName = this.ocrList.regions[this.ocrList.regions.length - 1];
+      const match = lastItemName.match(/(\d+)$/);
+      lastNumber = parseInt(match[1], 10);
+      const newRegion = `ocr${lastNumber + 1}`;
       this.ocrList.regions.push(newRegion);
       // Switch to new region and have main.js create a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
@@ -299,7 +311,7 @@ export default {
 }
 
 .fixed-width-input {
-  width: 5ch; /* Makes input wide enough for 3 characters */
+  width: 7ch; /* Makes input wide enough for 3 characters */
   padding: 0; /* Removes all padding */
   text-align: center;
 }
@@ -309,7 +321,7 @@ export default {
   height: auto;
 }
 
-.ocr-btn {
+.bold-btn {
   font-weight: bold; /* Force bold text */
 }
 </style>

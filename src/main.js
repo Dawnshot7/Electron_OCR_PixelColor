@@ -88,8 +88,8 @@ const modifiedImagePath = path.join(__dirname, 'assets/modifiedImage.png');
  */
 function createWindow() {
   win = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: 1100,
+    height: 700,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true, // Important for enabling IPC usage
@@ -114,14 +114,18 @@ function createWindow() {
       const selectedRegion = state['pixelCoords']['selected'].regionSelected
       const selectedX = state['pixelCoords'][selectedRegion].x
       const selectedY = state['pixelCoords'][selectedRegion].y
-      const color = robot.getPixelColor(selectedX, selectedY);
-      win.webContents.send('pixelColor', { color }); // Sending pixel data
+      const liveColor = robot.getPixelColor(selectedX, selectedY);
+      win.webContents.send('pixelColor', { liveColor }); // Sending pixel data
     }
     // Perform OCR on selected region on OCR Configurator component
     if (state['ocrRegions']['selected'].live) {
       const selectedRegion = state['ocrRegions']['selected'].regionSelected
       const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][selectedRegion]);
       win.webContents.send('ocrText', { ocrText }); // Sending OCR data
+      // Send the updated images
+      const unmodifiedImageData = fs.readFileSync('src/assets/unmodifiedImage.png');
+      const modifiedImageData = fs.readFileSync('src/assets/modifiedImage.png');
+      win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
     }
   }, 1000); // Interval set to 1000 milliseconds 
 }
@@ -242,20 +246,17 @@ async function evaluateConditions() {
     if (condition.ocrRegions) {
       // Perform OCR within the specified region
       const ocrRegion = condition.ocrRegions;
-      console.log(`Sending for ocr with: `, state.ocrRegions.ocrRegion);
       const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][ocrRegion]);
 
       // Check if OCR result matches the regex
       const regex = new RegExp(condition.regex);
       const match = ocrText.match(regex);
-      console.log(`Received: ${ocrText}, used regex: ${regex}, and got match result: `, match);
 
       if (match) {
         // Loop through each target in the matches array and perform the comparison
         for (let i = 0; i < condition.matches.length; i++) {
           const target = condition.matches[i];
           const matchedText = match[i + 1]; // Assuming capturing groups start from index 1 in the match array
-          console.log(`Match was true, i=${i}, matchedText: ${matchedText}, target value: ${target[1]}, target comparison: ${target[0]}`)
           // Perform comparison based on the specified type
           switch (target[0]) {
             case 'equals':
@@ -265,19 +266,18 @@ async function evaluateConditions() {
               matchedText !== target[1] ? truecount++ : falsecount++;
               break;
             case 'lessThan':
-              matchedText < target[1] ? truecount++ : falsecount++;
+              parseInt(matchedText, 10) <  parseInt(target[1], 10) ? truecount++ : falsecount++;
               break;
             case 'greaterThan':
-              matchedText > target[1] ? truecount++ : falsecount++;
+              parseInt(matchedText, 10) > parseInt(target[1], 10) ? truecount++ : falsecount++;
               break;
             case 'between':
-              matchedText > target[1] && matchedText < target.value[2] ? truecount++ : falsecount++;
+              parseInt(matchedText, 10) > parseInt(target[1], 10) && parseInt(matchedText, 10) < parseInt(target[2], 10) ? truecount++ : falsecount++;
               break;
             default:
               console.warn(`Unknown comparison type: ${target[0]}`);
           }
         }
-        console.log(`Truecount: ${truecount}, falsecount: ${falsecount}`)
 
       }
     }
@@ -288,7 +288,6 @@ async function evaluateConditions() {
         const pixelCoord = condition.pixelCoords[i];
         const { x, y, color } = state['pixelCoords'][pixelCoord];
         const comparison = condition.pixelComparison[i];
-        console.log(`pixelCoord: ${pixelCoord}, x: ${x}, y: ${y}, color: ${color}, comparison: ${comparison}, i: ${i}`)
         if (x && y) {
           // Get the color at specified pixel using RobotJS
           const colorAtPixel = robot.getPixelColor(x, y);
@@ -302,8 +301,6 @@ async function evaluateConditions() {
             falsecount++;
           }
         }
-        console.log(`Truecount: ${truecount}, falsecount: ${falsecount}`)
-
       }
     }
 
@@ -360,6 +357,13 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
 
         // Update coordinates and desired color for .regionSelected
         const thisRegion = state['pixelCoords']['selected'].regionSelected
+
+        const screenshot = robot.screen.capture(x1-50, y1-50, 100, 100);
+        const imagePath = path.join(__dirname, `assets/${thisRegion}.png`);
+        await saveScreenshotAsPNG(screenshot, imagePath);
+        const imageData = fs.readFileSync(imagePath);
+        win.webContents.send('updatePixelImages', { imageData });
+
         const pixelData = {
           x: x1,
           y: y1,
@@ -410,9 +414,14 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       } 
       // Process delete region request
       if (!state[variableName]['selected'].regions.includes(region) && state[variableName][region]) {
+        if (variableName === 'pixelCoords') {
+          fs.unlinkSync(`src/assets/${region}.png`);
+        }
         delete state[variableName][region];
         state[variableName]['selected'].regionSelected = state[variableName]['selected'].regions[0];
       }
+
+      region = state[variableName]['selected'].regionSelected
 
       if (variableName === 'ocrRegions') {
         // Perform OCR and send the recognized text
@@ -426,6 +435,14 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
         win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
         console.log('Sent both images');
       }
+      if (variableName === 'pixelCoords') {
+        if (!fs.existsSync(`src/assets/${region}.png`)) {
+          fs.copyFileSync(`src/assets/pixelsDefault.png`,`src/assets/${region}.png`)
+        }
+        const imageData = fs.readFileSync(`src/assets/${region}.png`);
+        win.webContents.send('updatePixelImages', { imageData });
+        console.log(`sent image for: ${region}`);
+       }
     }
     if (key === 'selected' ) {
       // Handle region change and component load by sending config and listbox data

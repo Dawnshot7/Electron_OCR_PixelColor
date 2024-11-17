@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onupdateConfig: (callback) => ipcRenderer.on('updateConfig', (event, data) => callback(data)),
   // Used by OCRConfigurator to receive updated images upon change in config settings
   onupdateImages: (callback) => ipcRenderer.on('updateImages', (event, data) => callback(data)),
+  // Used by OCRConfigurator to receive updated images upon change in config settings
+  onupdatePixelImages: (callback) => ipcRenderer.on('updatePixelImages', (event, data) => callback(data)),
   // Used by OCRConfigurator to receive OCR text on config settings change or live update
   onOCRText: (callback) => ipcRenderer.on('ocrText', callback),
   // Used by PixelSelector to receive live updates of color of currently selected pixel
