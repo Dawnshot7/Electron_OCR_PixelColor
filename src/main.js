@@ -17,10 +17,23 @@ let win; // Variable to hold the reference to the main application window
 let overlayWindow; // Variable to hold the reference to the transparent alert window
 let state = {}; // Variable to hold all data from config.ini upon loadConfig()
 
+const isDev = process.env.NODE_ENV === 'development'; // Set NODE_ENV in development
+const basePath = isDev 
+  ? __dirname  // In development, use the src folder directly 
+  : path.join(process.resourcesPath, 'app/src'); // Adjust for the packaged app
+
+const configPath = path.join(basePath, 'config/config.ini');
+const unmodifiedImagePath = path.join(basePath, 'assets/unmodifiedImage.png');
+const modifiedImagePath = path.join(basePath, 'assets/modifiedImage.png');
+const pixelsDefaultImagePath = path.join(basePath, 'assets/pixelsDefault.png');
+const overlayHTMLPath = path.join(basePath, 'renderer/overlay.html');
+const indexHTMLPath = path.join(basePath, 'renderer/index.html');
+
+console.log(configPath);
 // Event listener for when the application is ready
 app.on('ready', () => {
   // Load config before creating the window
-  loadConfig('src/config/config.ini');
+  loadConfig(configPath);
   
   // Now create the windows after their config is loaded
   createWindow();
@@ -29,7 +42,7 @@ app.on('ready', () => {
 
 // Quit the app when all windows are closed, unless on macOS
 app.on('window-all-closed', () => {
-  saveConfig('src/config/config.ini');
+  saveConfig(configPath);
   if (process.platform !== 'darwin') app.quit();
 });
 
@@ -78,8 +91,7 @@ function saveConfig(filePath) {
   fs.writeFileSync(filePath, iniString, 'utf-8');
 }
 
-const unmodifiedImagePath = path.join(__dirname, 'assets/unmodifiedImage.png');
-const modifiedImagePath = path.join(__dirname, 'assets/modifiedImage.png');
+
 
 /**
  * Function to create the main application window.
@@ -93,12 +105,12 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true, // Important for enabling IPC usage
-      preload: path.join(__dirname, 'preload.js'), // Path to preload.js
+      preload: path.join(basePath, 'preload.js'), // Path to preload.js
     }
   });
 
   // Load the HTML file for the renderer process
-  win.loadFile('src/renderer/index.html');
+  win.loadFile(indexHTMLPath);
 
   // Set an interval to monitor the pixel color and OCR repeatedly
   setInterval(async () => {
@@ -123,8 +135,8 @@ function createWindow() {
       const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][selectedRegion]);
       win.webContents.send('ocrText', { ocrText }); // Sending OCR data
       // Send the updated images
-      const unmodifiedImageData = fs.readFileSync('src/assets/unmodifiedImage.png');
-      const modifiedImageData = fs.readFileSync('src/assets/modifiedImage.png');
+      const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
+      const modifiedImageData = fs.readFileSync(modifiedImagePath);
       win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
     }
   }, 1000); // Interval set to 1000 milliseconds 
@@ -144,12 +156,12 @@ function createOverlayWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, 'overlayPreload.js'),
+      preload: path.join(basePath, 'overlayPreload.js'),
     }
   });
 
   overlayWindow.setIgnoreMouseEvents(true, {forward: true}); // Makes it click-through
-  overlayWindow.loadFile('src/renderer/overlay.html'); // Load overlay HTML file
+  overlayWindow.loadFile(overlayHTMLPath); // Load overlay HTML file
   overlayWindow.hide(); // Start hidden
   overlayWindow.webContents.on('did-finish-load', () => {
     overlayWindow.webContents.send('initAlerts', state['alerts']); // Send initial data after loading
@@ -317,8 +329,8 @@ async function evaluateConditions() {
 ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
   console.log('starting ahk script');
   // getBoxCoords.ahk collects two mouse clicks, getPixelCoords.ahk collects one click
-  const ahkPath = path.join(__dirname, '../scripts/AutoHotkeyA32.exe');
-  const ahkScript = path.join(__dirname, `../scripts/${scriptName}.ahk`);
+  const ahkPath = path.join(basePath, '../scripts/AutoHotkeyA32.exe');
+  const ahkScript = path.join(basePath, `../scripts/${scriptName}.ahk`);
   const ahkProcess = spawn(ahkPath, [ahkScript, arg1, arg2]);
 
   // AHK script stdout variable returns mouse click coordinate values
@@ -347,8 +359,8 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
         console.log('Image processed and saved successfully');
     
         // Read and send the images
-        const unmodifiedImageData = fs.readFileSync('src/assets/unmodifiedImage.png');
-        const modifiedImageData = fs.readFileSync('src/assets/modifiedImage.png');
+        const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
+        const modifiedImageData = fs.readFileSync(modifiedImagePath);
         win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
         console.log('Sent both images'); 
       } else if (scriptName === 'getPixelCoords'){
@@ -359,7 +371,7 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
         const thisRegion = state['pixelCoords']['selected'].regionSelected
 
         const screenshot = robot.screen.capture(x1-50, y1-50, 100, 100);
-        const imagePath = path.join(__dirname, `assets/${thisRegion}.png`);
+        const imagePath = path.join(basePath, `assets/${thisRegion}.png`);
         await saveScreenshotAsPNG(screenshot, imagePath);
         const imageData = fs.readFileSync(imagePath);
         win.webContents.send('updatePixelImages', { imageData });
@@ -375,7 +387,7 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
         // Send current coords and color of new pixel to be displayed by component
         win.webContents.send('updateConfig', { pixelData });
       }      
-      saveConfig('src/config/config.ini');   
+      saveConfig(configPath);   
     } else {
       console.log('No coordinates received from AHK script');
     }
@@ -422,6 +434,7 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       }
 
       region = state[variableName]['selected'].regionSelected
+      const regionImagePath = path.join(basePath, `assets/${region}.png`);
 
       if (variableName === 'ocrRegions') {
         // Perform OCR and send the recognized text
@@ -430,16 +443,16 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
         console.log('Image processed and saved successfully');
 
         // Send the updated images
-        const unmodifiedImageData = fs.readFileSync('src/assets/unmodifiedImage.png');
-        const modifiedImageData = fs.readFileSync('src/assets/modifiedImage.png');
+        const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
+        const modifiedImageData = fs.readFileSync(modifiedImagePath);
         win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
         console.log('Sent both images');
       }
       if (variableName === 'pixelCoords') {
-        if (!fs.existsSync(`src/assets/${region}.png`)) {
-          fs.copyFileSync(`src/assets/pixelsDefault.png`,`src/assets/${region}.png`)
+        if (!fs.existsSync(regionImagePath)) {
+          fs.copyFileSync(pixelsDefaultImagePath, regionImagePath)
         }
-        const imageData = fs.readFileSync(`src/assets/${region}.png`);
+        const imageData = fs.readFileSync(regionImagePath);
         win.webContents.send('updatePixelImages', { imageData });
         console.log(`sent image for: ${region}`);
        }
@@ -458,7 +471,7 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       win.webContents.send('updateConfig', { selectedValues });
       console.log(`Main replied: `, selectedList);
     }
-    saveConfig('src/config/config.ini');
+    saveConfig(configPath);
   } catch (error) {
     console.error('Error updating variable:', error);
   }

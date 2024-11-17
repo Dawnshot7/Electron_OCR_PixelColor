@@ -131,14 +131,15 @@
           <b-col cols="6" md="6">
             
             <!-- OCR Text -->
-            <b-row class="mt-3">
-              <div id="ocrText" class="p-2">{{ ocrText }}</div>
+            <b-row class="d-flex justify-content-center mt-3">
+              <label for="ocrText" style="width: 80%">OCR results text:</label>
+              <div id="ocrText" style="width: 80%" class="p-2">{{ ocrText }}</div>
             </b-row>
 
             <!-- Live OCR text checkbox -->
             <b-row class="mt-3">
               <div class="d-flex justify-content-center">
-                <b-form-checkbox v-model="ocrList.live" @change="toggleLive">Live OCR text</b-form-checkbox>
+                <b-form-checkbox v-model="ocrList.live" @change="toggleLive">Live OCR</b-form-checkbox>
               </div>
             </b-row>
 
@@ -318,7 +319,8 @@ export default {
 
 .container .img-fluid {
   max-width: 100%;
-  height: auto;
+  object-fit: contain;
+  max-height: 100px;
 }
 
 .bold-btn {

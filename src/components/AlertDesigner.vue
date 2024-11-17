@@ -105,8 +105,8 @@
             </b-row>
 
             <!-- Font Color Listbox -->
-            <b-row class="mt-3">
-              <b-form-group label="Font Color" label-for="fontColor">
+            <b-row class="d-flex justify-content-center mt-3">
+              <b-form-group label="Font Color" label-for="fontColor" style="max-width: 50%">
                 <b-form-select
                   id="fontColor"
                   v-model="alertsConfig.color"

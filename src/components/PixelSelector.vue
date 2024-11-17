@@ -98,14 +98,16 @@
           <b-col cols="6" md="6">
 
             <!-- Pixel color  -->
-            <div 
-                id="color-info" 
-                class="mt-1 pixelText" 
-                :style="{ color: pixelConfig.liveColor }"
-                v-html="colorInfo"
-              >
-            </div>
-
+            <b-row class="align-items-center justify-content-center mb-3" style="width: 90%; height: 116px;">
+              <div 
+                  id="color-info" 
+                  class="mt-1 pixelText" 
+                  :style="{ color: pixelConfig.liveColor }"
+                  v-html="colorInfo"
+                >
+              </div>
+            </b-row>
+            
             <!-- Live pixel color checkbox -->
             <b-row class="mt-3">
               <div class="d-flex justify-content-center">
