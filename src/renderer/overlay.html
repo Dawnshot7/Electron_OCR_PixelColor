@@ -5,31 +5,27 @@
   <title>Overlay</title>
   <style>
     body {
-      background: rgba(0, 0, 0, 0); /* Adjust transparency as needed */
+      background: rgba(0, 0, 0, 0); /* Set transparency of overlay background to fully transparent */
     }
-    .test-box {
-      border: 2px solid white;
-      padding: 20px;
-      background-color: rgba(255, 255, 255, 0);
-    }
+
     .alert {
-      position: absolute;
+      position: absolute; /* Exact alert position on screen is set by the user */
       padding: 20px;
-      background-color: rgba(255, 255, 255, 0.0);
-      display: 'none';
+      background-color: rgba(255, 255, 255, 0.0); /* Only alert text is visible, no background or border */
+      display: 'none'; /* Visibility of alerts set to false on initiation */
     }
-    /* Style for draggable alerts */
-    .draggable {
-      cursor: move;
+
+    .draggable { 
+      cursor: move; /* Style to make alerts draggable. Will be added dynamically when alerts are rendered by onDragAlerts() and removed when hideDraggableOverlay is clicked. */
     }
   </style>
 </head>
 <body>
-  <button id="hideDraggableOverlay">Hide Edit Mode Overlay</button> <!-- Button to toggle edit mode -->
-  <div id="alerts-container"></div> <!-- Container for dynamic alerts -->
+  <button id="hideDraggableOverlay">Hide Edit Mode Overlay</button> <!-- Button exit edit-mode and hide the clickable overlay -->
+  <div id="alerts-container"></div> <!-- Container where dynamic alerts will be placed. Will be cleared at the start of renderAlerts() -->
 
   <script>
-    // Track edit mode state
+    // Track edit mode state where alerts are made draggable
     let isEditMode = false;
 
     // Initialize all alerts on load
@@ -46,7 +42,7 @@
       renderAlerts(alerts);
     });
 
-    // Show/hide alerts based on continuous IPC data in game mode
+    // Show/hide alerts based on continuous IPC data in game mode. Message will be received every 1000ms.
     window.electronAPI.onUpdateVisibleAlerts((visibleAlertIds) => {
       const alertDivs = document.querySelectorAll('.alert');
       alertDivs.forEach(alertDiv => {
@@ -58,19 +54,21 @@
       });
     });
 
-    // Function to render alerts based on config
+    // Function to render alerts based on position, size and color defined in config data
     function renderAlerts(alertConfig) {
       const alertsContainer = document.getElementById('alerts-container');
       alertsContainer.innerHTML = ''; // Clear existing alerts
 
+      // Each alert will be created with its id set to the alertConfig key. The alert properties are set to alert.x, .y, .type, .content, .color, and .textSize
       for (const [key, alert] of Object.entries(alertConfig)) {
-        if (alert && typeof alert === 'object' && 'x' in alert && 'y' in alert && key !== 'alertsDefault') {
+        if (alert && typeof alert === 'object' && 'x' in alert && 'y' in alert && key !== 'alertsDefault' && key !== 'selected') {
           const alertDiv = document.createElement('div');
           alertDiv.classList.add('alert');
           alertDiv.id = key; // Set ID for drag handling
-          alertDiv.style.left = `${alert.x}px`;
-          alertDiv.style.top = `${alert.y}px`;
+          alertDiv.style.left = `${alert.x}px`; // Set absolute x position
+          alertDiv.style.top = `${alert.y}px`; // Set absolute y position
 
+          // Image alerts are a future development idea and are not yet used
           if (alert.type === 'image') {
             const img = document.createElement('img');
             img.src = alert.src;
@@ -78,9 +76,9 @@
             img.style.height = '100%';
             alertDiv.appendChild(img);
           } else if (alert.type === 'text') {
-            alertDiv.innerText = alert.content || '';
-            alertDiv.style.color = alert.color || 'white';
-            alertDiv.style.fontSize = (alert.textSize || '20') + 'px';
+            alertDiv.innerText = alert.content || ''; // Set alert text 
+            alertDiv.style.color = alert.color || 'white'; // Set text color
+            alertDiv.style.fontSize = (alert.textSize || '20') + 'px'; // Set text fontSize
           }
 
           // Add drag capabilities if in edit mode
@@ -90,34 +88,36 @@
             alertDiv.addEventListener('dragstart', handleDragStart);
             alertDiv.addEventListener('drag', handleDrag);
             alertDiv.addEventListener('dragend', handleDragEnd);
-            alertDiv.style.display = 'block';            
+            alertDiv.style.display = 'block'; // Set visibility for all alerts to true in edit-mode
           }
 
-          alertsContainer.appendChild(alertDiv);
+          alertsContainer.appendChild(alertDiv); // Add all alerts to the container
         }
       }
     }
 
-    // Function to toggle edit mode
+    // Event listener for the button that triggers the function to hide the draggable alert overlay and turn off edit-mode 
     document.getElementById('hideDraggableOverlay').addEventListener('click', hideDraggableOverlay);
 
     function hideDraggableOverlay() {
       isEditMode = false;
       const alertDivs = document.querySelectorAll('.alert');
 
-      // Notify main process to enable or disable click-through
+      // Notify main process to hide the draggable alert overlay
       window.electronAPI.hideDraggableOverlay();
 
+      // Remove draggable class from each alert
       alertDivs.forEach(alertDiv => {
         alertDiv.classList.remove('draggable');
         alertDiv.removeAttribute('draggable');
         alertDiv.removeEventListener('dragstart', handleDragStart);
         alertDiv.removeEventListener('drag', handleDrag);
         alertDiv.removeEventListener('dragend', handleDragEnd);
-        alertDiv.style.display = 'none';  
+        alertDiv.style.display = 'none';  // Set each alert back to hidden
       });
     }
 
+    // Used to track movement of alert as it is dragged, so new absolute alert position can be sent back to main.js
     let offsetX, offsetY;
 
     // Start drag handler

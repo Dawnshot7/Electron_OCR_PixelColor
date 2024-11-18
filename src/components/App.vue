@@ -1,22 +1,36 @@
 <template>
   <div class="app-container">
-    <!-- Sidebar for tab switching -->
+    <!-- Sidebar for switching between tabs. Uses Bootstrap Vue's vertical navigation for layout -->
     <b-nav vertical class="sidebar">
-      <b-nav-item @click="currentTab = 'OCRConfigurator'" :active="currentTab === 'OCRConfigurator'">
+
+      <b-nav-item 
+        @click="currentTab = 'OCRConfigurator'" 
+        :active="currentTab === 'OCRConfigurator'"
+      >
         OCR Configurator
       </b-nav-item>
-      <b-nav-item @click="currentTab = 'PixelSelector'" :active="currentTab === 'PixelSelector'">
+      <b-nav-item 
+        @click="currentTab = 'PixelSelector'" 
+        :active="currentTab === 'PixelSelector'"
+      >
         Pixel Selector
       </b-nav-item>
-      <b-nav-item @click="currentTab = 'AlertDesigner'" :active="currentTab === 'AlertDesigner'">
+      <b-nav-item 
+        @click="currentTab = 'AlertDesigner'" 
+        :active="currentTab === 'AlertDesigner'"
+      >
         Alert Designer
       </b-nav-item>
-      <b-nav-item @click="currentTab = 'Conditions'" :active="currentTab === 'Conditions'">
+      <b-nav-item 
+        @click="currentTab = 'Conditions'" 
+        :active="currentTab === 'Conditions'"
+      >
         Conditions
       </b-nav-item>
+
     </b-nav>
 
-    <!-- Main Content Area -->
+    <!-- Main content area for displaying the selected component. Dynamically renders the component associated with the current tab -->
     <div class="content-area">
       <component :is="currentTabComponent" />
     </div>
@@ -24,40 +38,43 @@
 </template>
 
 <script>
-import OCRConfigurator from './OCRConfigurator.vue';
-import PixelSelector from './PixelSelector.vue';
-import AlertDesigner from './AlertDesigner.vue';
-import Conditions from './Conditions.vue';
+// Import the four child components for different functionalities
+import OCRConfigurator from './OCRConfigurator.vue'; // Handles OCR region configuration for monitoring by conditions
+import PixelSelector from './PixelSelector.vue'; // Manages pixel selection for color monitoring by conditions
+import AlertDesigner from './AlertDesigner.vue'; // Designs on-screen alerts to be triggered by conditions 
+import Conditions from './Conditions.vue'; // Configures logical conditions for display of alerts
 
 export default {
-  name: 'App',
+  name: 'App', // Main application container
   components: {
+    // Register the child components
     OCRConfigurator,
     PixelSelector,
     AlertDesigner,
-    Conditions
+    Conditions,
   },
   data() {
     return {
+      // Tracks the currently selected tab (default is OCR Configurator)
       currentTab: 'OCRConfigurator',
     };
   },
   computed: {
+    // Dynamically resolves the component to render based on the selected tab
     currentTabComponent() {
-    // Return the appropriate component based on the currentTab value
-    switch (this.currentTab) {
-      case 'OCRConfigurator':
-        return OCRConfigurator;
-      case 'PixelSelector':
-        return PixelSelector;
-      case 'AlertDesigner':
-        return AlertDesigner;
-      case 'Conditions':
-        return Conditions;
-      default:
-        return null; // Or a default component if you have one
-    }
-  }
+      switch (this.currentTab) {
+        case 'OCRConfigurator':
+          return OCRConfigurator; 
+        case 'PixelSelector':
+          return PixelSelector; 
+        case 'AlertDesigner':
+          return AlertDesigner; 
+        case 'Conditions':
+          return Conditions; 
+        default:
+          return null; // Fallback if no valid tab is selected
+      }
+    },
   },
 };
 </script>
@@ -143,22 +160,5 @@ button:hover {
 
 button:focus {
   outline: none; /* Remove default outline */
-}
-
-#color-info, #ocrText {
-  background-color: #fff; /* White background for info boxes */
-  padding: 10px;
-  border-radius: 4px;
-  border: 1px solid #ccc;
-  margin-top: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for the text boxes */
-}
-
-#color-info {
-  margin-top: 20px;
-}
-
-#ocrText {
-  margin-top: 10px;
 }
 </style>

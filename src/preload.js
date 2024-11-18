@@ -6,20 +6,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Used by all componenets to update variables in main.js and config.ini upon changes in the component
   updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value }),
-  // Used by OCRConfigurator and PixelSelector components to select coordinates for OCR boxes and pixels
+  // Used by OCRConfigurator and PixelSelector components to select coordinates for OCR boxes and pixels using AHK scripts
   runAhkScript: (scriptName, arg1, arg2) => ipcRenderer.send('run-ahk-script', { scriptName, arg1, arg2 }),
   // Used by AlertDesigner component to show draggable, clickable alert overlay
   showDraggableOverlay: () => ipcRenderer.send('showDraggableOverlay'),  
-  // Used by conditions to toggle visibility of game-mode alert overlay
+  // Used by Conditions component to toggle visibility of game-mode, click-through alert overlay
   toggleGameModeOverlay: () => ipcRenderer.send('toggleGameModeOverlay'),
   
   // Used by all components to populate their listboxes on component load
   onupdateList: (callback) => ipcRenderer.on('updateList', (event, data) => callback(data)),
-  // Used by OCRConfigurator component to receive config fields data upon listbox selection change or component load
+  // Used by all components to receive config fields data upon listbox selection change or component load
   onupdateConfig: (callback) => ipcRenderer.on('updateConfig', (event, data) => callback(data)),
-  // Used by OCRConfigurator to receive updated images upon change in config settings
+  // Used by OCRConfigurator component to receive updated images upon change in config settings or live update
   onupdateImages: (callback) => ipcRenderer.on('updateImages', (event, data) => callback(data)),
-  // Used by OCRConfigurator to receive updated images upon change in config settings
+  // Used by PixelSelector component to receive updated images upon change in config settings or new pixel selection
   onupdatePixelImages: (callback) => ipcRenderer.on('updatePixelImages', (event, data) => callback(data)),
   // Used by OCRConfigurator to receive OCR text on config settings change or live update
   onOCRText: (callback) => ipcRenderer.on('ocrText', callback),

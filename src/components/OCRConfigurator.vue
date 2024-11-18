@@ -3,7 +3,7 @@
     <h1 class="mb-3">OCR Configurator</h1>
     <b-row>
 
-      <!-- Left Column with Listbox of Pixel Regions -->
+      <!-- Left column with listbox of OCR regions -->
       <b-col cols="3" md="3" style="min-width: 200px;">
         <div 
           class="list-group listbox-container" 
@@ -19,7 +19,7 @@
             {{ region }}
           </button>
 
-          <!-- Render "empty" placeholders for remaining slots up to 12 -->
+          <!-- Render "empty" placeholders for remaining slots up to 11 -->
           <button
             v-for="index in Math.max(0, 11 - ocrList.regions.length)"
             :key="'empty-' + index"
@@ -55,10 +55,10 @@
       <!-- All other content in component -->
       <b-col cols="9" md="9" class="image-region">
         
-        <!-- Display unmodified image, modified image and OCR text in top Row -->
+        <!-- Top row to display unmodified image and modified image with a max row height -->
         <b-row class="align-items-center justify-content-center mb-3" style="height: 100px;">
 
-          <!-- Images Side by Side -->
+          <!-- Images Side by Side, centered within their column, with object-fit: contain and max-height of 100px -->
           <b-col cols="6" md="6">
             <div class="d-flex justify-content-center">
               <b-img id='unmodifiedImage' src='' alt="Unmodified Image" class="img-fluid" ></b-img>
@@ -75,10 +75,10 @@
         <!-- Bottom row with OCR Configuration Fields in Columns -->
         <b-row>
 
-          <!-- Left column with box position, capture coords, show overlay, rename, new region, delete region -->
+          <!-- Left column with box position and capture coordinates button -->
           <b-col cols="6" md="6">
 
-            <!-- Position Fields -->
+            <!-- Position Fields with coordinates displayed in read-only input fields -->
             <b-row class="mt-3">
               <div class="d-flex justify-content-center">
                 <label for="input-x">  X:</label>
@@ -121,13 +121,9 @@
               <b-button @click="startCaptureBox" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Start Coordinate Capture</b-button>
             </b-row>
 
-            <!-- Button to show current ocr box on overlay -->
-            <!-- Edit box to change region name  -->
-            <!-- Button to create a new region with default settings -->
-            <!-- Button to delete current region from the list -->
           </b-col>
 
-           <!-- Middle column with image modification fields (Invert, brightness, contrast) -->
+           <!-- Middle column with OCR text output and image modification fields (Invert, brightness, contrast) -->
           <b-col cols="6" md="6">
             
             <!-- OCR Text -->
@@ -191,17 +187,17 @@
 </template>
 
 <script>
-import { toRaw } from 'vue';
+import { toRaw } from 'vue'; //used for serializing arrays sent to main.js over ipc
 export default {
   data() {
     return {
       ocrList: {
-        profile: 'initial',
-        regions: ['initial'],
-        regionSelected: 'initial',
+        profile: '',
+        regions: [''],
+        regionSelected: '',
         live: false
       },
-      ocrText: 'initial',
+      ocrText: '',
       ocrConfig: {
         x: 0,
         y: 0,
@@ -233,48 +229,40 @@ export default {
       window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { contrast: this.ocrConfig.contrast });
     },
     regionChange(newSelection) {
-      // Change ocr box being displayed and have main.js send the new box's config data
+      // Change OCR region being displayed and have main.js send back the new box's config data
       this.ocrList.regionSelected = newSelection;
       window.electronAPI.updateVariable('ocrRegions', 'selected', { regionSelected: newSelection });
       window.electronAPI.updateVariable('ocrRegions', 'selected', { regions: this.ocrList.regions });
     },
     addRegion() {
-      // Add a new OCR region to the list 
+      // Add a new OCR region to the listbox
       let lastNumber = 0;
       const lastItemName = this.ocrList.regions[this.ocrList.regions.length - 1];
       const match = lastItemName.match(/(\d+)$/);
       lastNumber = parseInt(match[1], 10);
       const newRegion = `ocr${lastNumber + 1}`;
       this.ocrList.regions.push(newRegion);
-      // Switch to new region and have main.js create a new region in config.ini and send back default config settings
+      // Switch to new region. Main.js will add a new region in config.ini and send back default config settings
       this.regionChange(newRegion);
     },
     deleteRegion() {
+      // Delete current OCR region from the listbox
       if (this.ocrList.regions.length > 1) {
         const index = this.ocrList.regions.findIndex(region => region === this.ocrList.regionSelected);
         this.ocrList.regions.splice(index, 1);
         const serializableRegions = toRaw(this.ocrList);
+        // Sending ocrList with the current region deleted, which will request main.js to delete the region data from config.ini
         window.electronAPI.updateVariable('ocrRegions', 'selected', serializableRegions);
       }   
     },
     toggleLive() {
-      // Turns on/off OCR being performed in setinterval in main.js and result sent back every second 
+      // Turns on/off OCR being performed in setinterval in main.js which sends back the result every second for display
       window.electronAPI.updateVariable('ocrRegions', 'selected', { live: this.ocrList.live });
-    },
-    toggleOverlay() {
-      window.electronAPI.toggleOverlay();
-      console.log('toggled overlay')
     }
   },
   mounted() {
-    // Trigger main.js to send list, config and images on component load 
+    // Trigger main.js to send ocrList, ocrConfig and images on component load (whenever 'selected' is sent by updateVariable as second parameter)
     window.electronAPI.updateVariable('ocrRegions', 'selected', { live: false });
-
-    // Handle OCR text event from Electron
-    window.electronAPI.onOCRText((event, ocrData) => {
-      const { ocrText } = ocrData;
-      this.ocrText = `${ocrText || 'No text found'}`;
-    });
 
     // Listen for variable updates to populate the form fields
     window.electronAPI.onupdateConfig(({ selectedValues }) => {
@@ -285,16 +273,16 @@ export default {
       }
     });
 
-    // Listen for updates to populate the list box on component load
+    // Listen for updates to populate the list box
     window.electronAPI.onupdateList(({ selectedList }) => {
       if (selectedList) {
-        // Populate fields from selectedValues
+        // Populate fields from selectedList
         this.ocrList = { ...this.ocrList, ...selectedList };
         console.log('received list');
       }
     }); 
 
-    // Listen for the combined images message
+    // Listen for the combined images message and update them in the html
     window.electronAPI.onupdateImages(({ unmodifiedImageData, modifiedImageData }) => {
       const unmodifiedBlob = new Blob([unmodifiedImageData], { type: 'image/png' });
       document.getElementById('unmodifiedImage').src = URL.createObjectURL(unmodifiedBlob);
@@ -302,28 +290,38 @@ export default {
       const modifiedBlob = new Blob([modifiedImageData], { type: 'image/png' });
       document.getElementById('modifiedImage').src = URL.createObjectURL(modifiedBlob);
     });
+
+    // Listen for OCR text result to populate field in the html
+    window.electronAPI.onOCRText((event, ocrData) => {
+      const { ocrText } = ocrData;
+      this.ocrText = `${ocrText || 'No text found'}`;
+    });
   }
 };
 </script>
 
 <style scoped>
-#ocrText {
-  font-weight: bold;
+.bold-btn {
+  font-weight: bold; /* Force bold text on listbox items */
 }
 
-.fixed-width-input {
-  width: 7ch; /* Makes input wide enough for 3 characters */
-  padding: 0; /* Removes all padding */
-  text-align: center;
-}
-
-.container .img-fluid {
-  max-width: 100%;
-  object-fit: contain;
+.img-fluid {
+  object-fit: contain; /* Makes images always fit in 100px height */
   max-height: 100px;
 }
 
-.bold-btn {
-  font-weight: bold; /* Force bold text */
+.fixed-width-input {
+  width: 7ch; /* Makes form field inputs wide enough for 4 characters */
+  padding: 0; 
+  text-align: center;
+}
+
+#ocrText {
+  background-color: #fff; /* White background for info boxes */
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+  margin-top: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for the text boxes */
 }
 </style>
