@@ -137,8 +137,10 @@ const createMenu = () => {
   Menu.setApplicationMenu(menu);
 };
 
+const fsPromises = fs.promises; // Import the promise-based API
+
 // Menu option to create a new profile (config .ini file) from default profile  
-function newProfile() {
+async function newProfile() {
   // Find a novel filename
   let index = 1;
   let newProfile = `profile${index}.ini`;
@@ -146,22 +148,30 @@ function newProfile() {
     newProfile = `profile${index}.ini`;
     index++;
   } 
-  // Update variables with new profile name
+
+  // Update current profile and profiles list variables with new profile name and update application menu
   configPath = path.join(configFolderPath, `${newProfile}`);
-  fs.writeFileSync(settingsPath, newProfile, 'utf-8');
+  await fsPromises.writeFile(settingsPath, newProfile, 'utf-8');
   currentProfile = newProfile;
   savedProfiles.push(newProfile);
   createMenu();
 
+  // Make new assets folder
+  const newAssetPath = path.join(basePath, `assets/${newProfile.slice(0, -4)}`);
+  await fsPromises.mkdir(newAssetPath);
+  await fsPromises.copyFile(path.join(basePath, 'assets/pixelsDefault.png'), path.join(newAssetPath, 'pixel1.png'));
+  await fsPromises.copyFile(path.join(basePath, 'assets/pixelsDefault.png'), path.join(newAssetPath, 'ocr1.png'));
+
   // Copy default profile config settings into new profile and load into the state variable
-  fs.copyFileSync(defaultProfilePath, configPath);
+  await fsPromises.copyFile(defaultProfilePath, configPath);
   loadConfig(configPath);
 
-  // Update variables in component representing configuration data for initially selected ocr region
+  // Update state variable and component regarding new profile name, and set initial component configuration data.
   state['ocrRegions'].selected.profile = newProfile.slice(0, -4);
   state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
   state['alerts'].selected.profile = newProfile.slice(0, -4);
   state['conditions'].selected.profile = newProfile.slice(0, -4);
+  saveConfig(configPath);  
   const selectedList = state['ocrRegions']['selected'];
   win.webContents.send('updateList', { selectedList });
   const selectedRegion = state['ocrRegions'].selected.regionSelected;
@@ -170,17 +180,14 @@ function newProfile() {
 }
 
 // Menu option to open a saved config .ini file  
-function openProfile(newProfile) {
-  fs.writeFileSync(settingsPath, newProfile, 'utf-8');
+async function openProfile(newProfile) {
+  // Set profile variables and load new config file
+  await fsPromises.writeFile(settingsPath, newProfile, 'utf-8');
   currentProfile = newProfile;
   configPath = path.join(configFolderPath, newProfile);
   loadConfig(configPath);
-  state['ocrRegions'].selected.profile = newProfile.slice(0, -4);
-  state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
-  state['alerts'].selected.profile = newProfile.slice(0, -4);
-  state['conditions'].selected.profile = newProfile.slice(0, -4);
 
-  // Update variables in component representing configuration data for initially selected ocr region
+  // Update variables in initial component representing configuration data for new profile. 
   const selectedList = state['ocrRegions']['selected'];
   win.webContents.send('updateList', { selectedList });
   const selectedRegion = state['ocrRegions'].selected.regionSelected;
@@ -189,38 +196,62 @@ function openProfile(newProfile) {
 }
 
 // Menu option to rename current config .ini file 
-ipcMain.on('renameProfile', (event, newProfile) => {  
+ipcMain.on('renameProfile', async (event, newProfile) => {
   if (savedProfiles.includes(newProfile)) {
     return
   } 
 
-  // Update variables with new profile name
+  // Copy config file to new filename and set new configPath 
   const oldConfigPath = configPath;
   configPath = path.join(configFolderPath, `${newProfile}`);
-  fs.copyFileSync(oldConfigPath, configPath);
-  fs.writeFileSync(settingsPath, newProfile, 'utf-8');
+  await fsPromises.copyFile(oldConfigPath, configPath);
+  await fsPromises.unlink(oldConfigPath);
+
+  // Change assets folder
+  const oldAssetPath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}`);
+  const newAssetPath = path.join(basePath, `assets/${newProfile.slice(0, -4)}`);
+  await fsPromises.mkdir(newAssetPath);
+  const files = await fsPromises.readdir(oldAssetPath);
+  await Promise.all(files.map(file => 
+    fsPromises.copyFile(path.join(oldAssetPath, file), path.join(newAssetPath, file))
+  ));
+  await fsPromises.rmdir(oldAssetPath, { recursive: true });
+
+  // Update the current profile and profile list variables
+  await fsPromises.writeFile(settingsPath, newProfile, 'utf-8');
   const index = savedProfiles.indexOf(currentProfile);
   savedProfiles.splice(index, 1);
   savedProfiles.push(newProfile);
   currentProfile = newProfile;
+
+  // Make updates in the application menu and state variable
   createMenu();
   state['ocrRegions'].selected.profile = newProfile.slice(0, -4);
   state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
   state['alerts'].selected.profile = newProfile.slice(0, -4);
   state['conditions'].selected.profile = newProfile.slice(0, -4);
-  fs.unlinkSync(oldConfigPath);
+  saveConfig(configPath);  
 });
 
 // Menu option to delete current config .ini file 
-function deleteProfile() {
-  fs.unlinkSync(configPath);
+async function deleteProfile() {
+  // Delete config file
+  await fsPromises.unlink(configPath);
+
+  // Delete assets folder
+  const assetsPath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}`);
+  await fsPromises.rmdir(assetsPath, { recursive: true });
+
+  // Remove profile from profiles list and update the application menu
   const index = savedProfiles.indexOf(currentProfile);
   savedProfiles.splice(index, 1);
   createMenu();
+
+  // if a profile remains in the list
   if (savedProfiles.length > 0) {
-    // Update variables with newwly selected profile name if a profile remains in the list and load profile into the state variable
+    // Update variables with newwly selected profile name and load profile
     const newProfile = savedProfiles[0];
-    fs.writeFileSync(settingsPath, newProfile, 'utf-8');
+    await fsPromises.writeFile(settingsPath, newProfile, 'utf-8');
     configPath = path.join(configFolderPath, newProfile);
     loadConfig(configPath);
     state['ocrRegions'].selected.profile = newProfile.slice(0, -4);
@@ -228,7 +259,7 @@ function deleteProfile() {
     state['alerts'].selected.profile = newProfile.slice(0, -4);
     state['conditions'].selected.profile = newProfile.slice(0, -4);
     
-    // Update variables in component representing configuration data for initially selected ocr region
+    // Update variables in initially selected component representing configuration data 
     const selectedList = state['ocrRegions']['selected'];
     win.webContents.send('updateList', { selectedList });
     const selectedRegion = state['ocrRegions'].selected.regionSelected;
@@ -533,7 +564,7 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
         // Take a screenshot of the region around the mouse position, save as PNG, and send to renderer
         const thisRegion = state['pixelCoords']['selected'].regionSelected
         const screenshot = robot.screen.capture(x1-50, y1-50, 100, 100);
-        const imagePath = path.join(basePath, `assets/${thisRegion}.png`);
+        const imagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${thisRegion}.png`);
         await saveScreenshotAsPNG(screenshot, imagePath);
         const imageData = fs.readFileSync(imagePath);
         win.webContents.send('updatePixelImages', { imageData });
@@ -590,7 +621,8 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       // Process delete region request when state[variableName] has config data for region, but region is no longer in the state[variableName]['selected'].regions array
       if (!state[variableName]['selected'].regions.includes(region) && state[variableName][region]) {
         if (variableName === 'pixelCoords') {
-          fs.unlinkSync(`src/assets/${region}.png`);
+          const regionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${region}.png`);
+          fs.unlinkSync(regionImagePath);
         }
         delete state[variableName][region];
         state[variableName]['selected'].regionSelected = state[variableName]['selected'].regions[0];
@@ -611,7 +643,7 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
       }
       if (variableName === 'pixelCoords') {
         // After new pixel region addition, copy the default image saying "No pixel selected" to the region's image filename and send to renderer
-        const regionImagePath = path.join(basePath, `assets/${region}.png`);
+        const regionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${region}.png`);
         if (!fs.existsSync(regionImagePath)) {
           fs.copyFileSync(pixelsDefaultImagePath, regionImagePath)
         }
