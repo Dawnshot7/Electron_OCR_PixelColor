@@ -46,6 +46,9 @@ fs.readdir(configFolderPath, (err, files) => {
   createMenu();
 });
 
+// Component opened at initiation
+let currentComponent = 'ocrRegions'
+
 // Event listener for when the application is ready
 app.on('ready', () => {
   // Load config before creating the window
@@ -172,11 +175,9 @@ async function newProfile() {
   state['alerts'].selected.profile = newProfile.slice(0, -4);
   state['conditions'].selected.profile = newProfile.slice(0, -4);
   saveConfig(configPath);  
-  const selectedList = state['ocrRegions']['selected'];
-  win.webContents.send('updateList', { selectedList });
-  const selectedRegion = state['ocrRegions'].selected.regionSelected;
-  const selectedValues = state['ocrRegions'][selectedRegion];
-  win.webContents.send('updateConfig', { selectedValues });
+
+  // Function to use new config to reperform ocr and update component variables and images 
+  updateComponents(currentComponent);
 }
 
 // Menu option to open a saved config .ini file  
@@ -187,12 +188,8 @@ async function openProfile(newProfile) {
   configPath = path.join(configFolderPath, newProfile);
   loadConfig(configPath);
 
-  // Update variables in initial component representing configuration data for new profile. 
-  const selectedList = state['ocrRegions']['selected'];
-  win.webContents.send('updateList', { selectedList });
-  const selectedRegion = state['ocrRegions'].selected.regionSelected;
-  const selectedValues = state['ocrRegions'][selectedRegion];
-  win.webContents.send('updateConfig', { selectedValues });
+  // Function to use new config to reperform ocr and update component variables and images 
+  updateComponents(currentComponent);
 }
 
 // Menu option to rename current config .ini file 
@@ -259,12 +256,8 @@ async function deleteProfile() {
     state['alerts'].selected.profile = newProfile.slice(0, -4);
     state['conditions'].selected.profile = newProfile.slice(0, -4);
     
-    // Update variables in initially selected component representing configuration data 
-    const selectedList = state['ocrRegions']['selected'];
-    win.webContents.send('updateList', { selectedList });
-    const selectedRegion = state['ocrRegions'].selected.regionSelected;
-    const selectedValues = state['ocrRegions'][selectedRegion];
-    win.webContents.send('updateConfig', { selectedValues });
+    // Function to use new config to reperform ocr and update component variables and images 
+    updateComponents(currentComponent);
   } else {
     // If no profiles remain create a new profile from default settings
     newProfile();
@@ -349,11 +342,10 @@ function createOverlayWindow() {
 // Function to capture, save, and process screenshots
 async function captureAndProcessScreenshot(ocrRegion) {
   // Capture the screen based on the passed ocrRegion
-  const screenshot = robot.screen.capture(ocrRegion.x, ocrRegion.y, ocrRegion.width, ocrRegion.height);
 
   try {
-    // Save the original screenshot as PNG
-    await saveScreenshotAsPNG(screenshot, unmodifiedImagePath);
+    // Capture the screen based on the passed ocrRegion and save the screenshot as PNG
+    await captureScreenshotAsPNG(ocrRegion, unmodifiedImagePath);
 
     // Process and save the modified image as another PNG
     await processAndSaveModifiedImage(unmodifiedImagePath, modifiedImagePath, ocrRegion);
@@ -367,8 +359,12 @@ async function captureAndProcessScreenshot(ocrRegion) {
   }
 }
 
-// Save original screenshot as PNG
-function saveScreenshotAsPNG(screenshot, filePath) {
+// Capture screenshot as PNG
+function captureScreenshotAsPNG(captureRegion, filePath) {
+  // Capture the screen based on the passed capture region 
+  const screenshot = robot.screen.capture(captureRegion.x, captureRegion.y, captureRegion.width, captureRegion.height);
+
+  // Save screenshot as png
   return new Promise((resolve, reject) => {
     const png = new PNG({ width: screenshot.width, height: screenshot.height });
     png.data = Buffer.from(screenshot.image);
@@ -548,6 +544,7 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
       
         // Perform OCR and send the recognized text and new OCR region configuration settings to the renderer
         const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][thisRegion]);
+        await fsPromises.copyFile(unmodifiedImagePath,path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${thisRegion}.png`));
         win.webContents.send('ocrText', { ocrText });
         win.webContents.send('updateConfig', { thisData });
         console.log('Image processed and saved successfully');
@@ -563,9 +560,9 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
 
         // Take a screenshot of the region around the mouse position, save as PNG, and send to renderer
         const thisRegion = state['pixelCoords']['selected'].regionSelected
-        const screenshot = robot.screen.capture(x1-50, y1-50, 100, 100);
+        const screenshotCoordinates = { x: x1-50, y: y1-50, width: 100, height: 100 };
         const imagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${thisRegion}.png`);
-        await saveScreenshotAsPNG(screenshot, imagePath);
+        await captureScreenshotAsPNG(screenshotCoordinates, imagePath);
         const imageData = fs.readFileSync(imagePath);
         win.webContents.send('updatePixelImages', { imageData });
 
@@ -602,82 +599,92 @@ ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
     } else if (!state[variableName][key]) {
       console.error(`Key ${key} not found in state[${variableName}]`);
     } else {
-
+      currentComponent = variableName;
       // Update the variable data key by key
       state[variableName][key] = { ...state[variableName][key], ...value };
       console.log(`Updated state[${variableName}][${key}]:`, value);
       
       // Currently selected ocr region/alert/pixel/condition
       region = state[variableName]['selected'].regionSelected
+      const regionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${region}.png`);
 
       // Process add new region request when state[variableName] doesn't have config data for region, and region is not yet in the state[variableName]['selected'].regions array
       if (!state[variableName]['selected'].regions.includes(region) && !state[variableName][region]) {
+        console.log(`Added new region: ${region} with default config`, state[variableName]['selected'].regions);
         // Set the config for the new region to the saved default configurations
         state[variableName][region] = { ...state[variableName][`${variableName}Default`] };
         // Add the region to the regions list
         state[variableName]['selected'].regions.push(region);
-        console.log(`Added new region: ${region} with default config`, state[variableName]['selected'].regions);
+        // After new region addition, copy the default image saying "No pixel selected" to the region's image filename 
+        if (variableName === 'pixelCoords' || variableName === 'ocrRegions') {
+          if (!fs.existsSync(regionImagePath)) {
+            fs.copyFileSync(pixelsDefaultImagePath, regionImagePath);
+          }
+        }
       } 
       // Process delete region request when state[variableName] has config data for region, but region is no longer in the state[variableName]['selected'].regions array
       if (!state[variableName]['selected'].regions.includes(region) && state[variableName][region]) {
-        if (variableName === 'pixelCoords') {
-          const regionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${region}.png`);
-          fs.unlinkSync(regionImagePath);
-        }
+        console.log(`Deleted new region: ${region} with default config`, state[variableName]['selected'].regions);
         delete state[variableName][region];
         state[variableName]['selected'].regionSelected = state[variableName]['selected'].regions[0];
-        region = state[variableName]['selected'].regionSelected
-      }
-
-      if (variableName === 'ocrRegions') {
-        // Perform OCR and send the recognized text after each config change
-        const ocrText = await captureAndProcessScreenshot(state[variableName][region]);
-        win.webContents.send('ocrText', { ocrText });
-        console.log('Image processed and saved successfully');
-
-        // Send the updated images after each config change
-        const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
-        const modifiedImageData = fs.readFileSync(modifiedImagePath);
-        win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
-        console.log('Sent both images');
-      }
-      if (variableName === 'pixelCoords') {
-        // After new pixel region addition, copy the default image saying "No pixel selected" to the region's image filename and send to renderer
-        const regionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${region}.png`);
-        if (!fs.existsSync(regionImagePath)) {
-          fs.copyFileSync(pixelsDefaultImagePath, regionImagePath)
+        region = state[variableName]['selected'].regionSelected;
+        // After region deletion, delete the saved image for that region
+        if (variableName === 'pixelCoords' || variableName === 'ocrRegions') {
+          if (fs.existsSync(regionImagePath)) {
+            fs.unlinkSync(regionImagePath);
+          }
         }
-        const imageData = fs.readFileSync(regionImagePath);
-        win.webContents.send('updatePixelImages', { imageData });
-        console.log(`sent image for: ${region}`);
-       }
-    }
-    if (key === 'selected' ) {
-      // Components will send the 'selected' key upon component load and after each region change, triggering this to send listbox data and new region config to renderer
-
-      // Updates variables in component used to populate listboxes
-      if (variableName === 'conditions') {
-        // The conditions component needs these additional arrays to populate it's dropdown listboxes
-        state['conditions']['selected'].ocrRegions = state['ocrRegions']['selected'].regions;
-        state['conditions']['selected'].pixelRegions = state['pixelCoords']['selected'].regions;
-        state['conditions']['selected'].alertRegions = state['alerts']['selected'].regions;
       }
-      const selectedList = state[variableName]['selected'];
-      win.webContents.send('updateList', { selectedList });
 
-      // Updates variables in component representing configuration data for selected ocr region/alert/pixel/condition
-      const selectedRegion = state[variableName].selected.regionSelected;
-      const selectedValues = state[variableName][selectedRegion];
-      win.webContents.send('updateConfig', { selectedValues });
-
-      console.log(`Main replied: `, selectedList);
-    }
+      // Function to use new config to reperform ocr and update component variables and images 
+      updateComponents(variableName);
+    }  
     // Save configuration data config.ini after each change in configuration settings variables
     saveConfig(configPath);
   } catch (error) {
     console.error('Error updating variable:', error);
   }
 });
+
+// Function to use new config to reperform ocr and update component variables and images 
+async function updateComponents(variableName) {
+  region = state[variableName]['selected'].regionSelected
+  const regionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${region}.png`);
+
+  if (variableName === 'ocrRegions') {
+    // Perform OCR and send the recognized text after each config change
+    await processAndSaveModifiedImage(regionImagePath, modifiedImagePath, state[variableName][region]);
+    const ocrText = await recognizeTextFromImage(modifiedImagePath);
+    win.webContents.send('ocrText', { ocrText });
+    console.log('Image processed and saved successfully');
+
+    // Send the updated images after each config change
+    const unmodifiedImageData = fs.readFileSync(regionImagePath);
+    const modifiedImageData = fs.readFileSync(modifiedImagePath);
+    win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
+    console.log('Sent both images');
+  }
+  if (variableName === 'pixelCoords') {
+    // After new pixel region addition, copy the default image saying "No pixel selected" to the region's image filename and send to renderer
+    const imageData = fs.readFileSync(regionImagePath);
+    win.webContents.send('updatePixelImages', { imageData });
+    console.log(`sent image for: ${region}`);
+   }
+  // Updates variables in component used to populate listboxes
+  if (variableName === 'conditions') {
+    // The conditions component needs these additional arrays to populate it's dropdown listboxes
+    state['conditions']['selected'].ocrRegions = state['ocrRegions']['selected'].regions;
+    state['conditions']['selected'].pixelRegions = state['pixelCoords']['selected'].regions;
+    state['conditions']['selected'].alertRegions = state['alerts']['selected'].regions;
+  }
+  const selectedList = state[variableName]['selected'];
+  win.webContents.send('updateList', { selectedList });
+
+  // Updates variables in component representing configuration data for selected ocr region/alert/pixel/condition
+  const selectedRegion = state[variableName].selected.regionSelected;
+  const selectedValues = state[variableName][selectedRegion];
+  win.webContents.send('updateConfig', { selectedValues });
+}
 
 // IPC listener to show overlay with draggable controls
 ipcMain.on('showDraggableOverlay', (event) => {
