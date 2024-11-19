@@ -1,8 +1,50 @@
 <template>
   <div class="app-container">
+ 
     <!-- Sidebar for switching between tabs. Uses Bootstrap Vue's vertical navigation for layout -->
     <b-nav vertical class="sidebar">
 
+      <!-- Profile name -->
+      <div class="profile-section d-flex justify-content-center" style="margin-bottom: 40px; width: 100%;">
+        <!-- Show Profile Name -->
+        <div v-if="!isRenaming">
+          <b-button 
+            @click="toggleRename" 
+            size="sm" 
+            variant="light"
+            style="margin-top: 20px; font-size: 16px"
+          >
+          {{ currentProfile }}
+          </b-button>
+        </div>
+        <!-- Show Rename Input -->
+        <div v-else>
+          <b-form-input 
+            v-model="newProfileName" 
+            placeholder="Enter new profile name" 
+            size="sm"
+            style="max-width: 200px;"
+          />
+          <b-button 
+            @click="renameProfile" 
+            variant="outline-success" 
+            size="sm" 
+            style="margin-left: 10px;"
+          >
+            Rename
+          </b-button>
+          <b-button 
+            @click="cancelRename" 
+            variant="outline-success" 
+            size="sm" 
+            style="margin-left: 5px;"
+          >
+            Cancel
+          </b-button>
+        </div>
+      </div>
+    
+      <!-- Sidebar items -->
       <b-nav-item 
         @click="currentTab = 'OCRConfigurator'" 
         :active="currentTab === 'OCRConfigurator'"
@@ -57,6 +99,9 @@ export default {
     return {
       // Tracks the currently selected tab (default is OCR Configurator)
       currentTab: 'OCRConfigurator',
+      currentProfile: 'Profile1',
+      newProfileName: '',
+      isRenaming: false
     };
   },
   computed: {
@@ -76,6 +121,32 @@ export default {
       }
     },
   },
+  methods: {
+    toggleRename() {
+      this.isRenaming = true;
+      this.newProfileName = this.currentProfile; // Prefill with the current profile name
+    },
+    renameProfile() {
+      if (this.newProfileName.trim() !== '') {
+        this.currentProfile = this.newProfileName.trim();
+        const newProfile = `${this.currentProfile}.ini`;
+        window.electronAPI.renameProfile(newProfile);
+      }
+      this.isRenaming = false; // Exit rename mode
+    },
+    cancelRename() {
+      this.isRenaming = false; // Exit rename mode without saving changes
+    },
+  },
+  mounted() {
+    // Listen for updates to populate the list box 
+    window.electronAPI.onupdateList(({ selectedList }) => {
+      if (selectedList) {
+        this.currentProfile = selectedList.profile;
+        console.log('Received list');
+      }
+    });
+  }
 };
 </script>
 
@@ -90,13 +161,14 @@ export default {
 .left-pane {
   display: flex; /* Enables Flexbox layout */
   flex-direction: column; /* Stack the buttons vertically */
-  justify-content: top; /* Centers buttons vertically */
+  justify-content: center; /* Centers buttons vertically */
   align-items: center; /* Centers buttons horizontally */
   width: 250px; /* Adjust the width of the sidebar */
   padding: 10px; /* Optional padding for spacing */
   background-color: #f4f4f4; /* Background color for the sidebar */
   border-right: 1px solid #ddd; /* Light border on the right side */
   height: 100vh; /* Ensures the sidebar takes up the full height */
+  object-fit: contain;
 }
 
 .content-area {

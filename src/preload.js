@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showDraggableOverlay: () => ipcRenderer.send('showDraggableOverlay'),  
   // Used by Conditions component to toggle visibility of game-mode, click-through alert overlay
   toggleGameModeOverlay: () => ipcRenderer.send('toggleGameModeOverlay'),
+  // Used by App.vue to send user request to rename profile to main.js
+  renameProfile: (newProfile) => ipcRenderer.send('renameProfile', newProfile),
   
   // Used by all components to populate their listboxes on component load
   onupdateList: (callback) => ipcRenderer.on('updateList', (event, data) => callback(data)),

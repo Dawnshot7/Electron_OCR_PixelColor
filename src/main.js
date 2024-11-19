@@ -1,5 +1,5 @@
 // Import necessary modules from Electron and RobotJS
-const { app, BrowserWindow } = require('electron'); // Electron APIs. Robotjs requires Electron v17.4.11
+const { app, Menu, BrowserWindow } = require('electron'); // Electron APIs. Robotjs requires Electron v17.4.11
 const { ipcMain } = require('electron'); // Transmit data to Vue components and back to main.js
 const robot = require('robotjs'); // RobotJS for taking screenshots and getting pixel color
 const fs = require('fs'); // Read from and write to config.ini and image files 
@@ -22,18 +22,35 @@ const basePath = isDev
   : path.join(process.resourcesPath, 'app/src'); // Adjust for the packaged app
 
 // Use basePath to construct all paths used in main.js
-const configPath = path.join(basePath, 'config/config.ini');
+const defaultProfilePath = path.join(basePath, 'config/profileDefault.ini');
 const unmodifiedImagePath = path.join(basePath, 'assets/unmodifiedImage.png');
 const modifiedImagePath = path.join(basePath, 'assets/modifiedImage.png');
 const pixelsDefaultImagePath = path.join(basePath, 'assets/pixelsDefault.png');
 const overlayHTMLPath = path.join(basePath, 'renderer/overlay.html');
 const indexHTMLPath = path.join(basePath, 'renderer/index.html');
 
+// Read saved selected profile from settings.txt to determine what configPath to use at initiation
+const settingsPath = path.join(basePath, 'config/settings.txt');
+let currentProfile = fs.readFileSync(settingsPath, 'utf-8').trim();
+const configFolderPath = path.join(basePath, 'config'); // Replace with your folder path
+let configPath = path.join(configFolderPath, `${currentProfile}`);
+
+// Collect the names of all available profiles to populate 'open profile' menu option
+let savedProfiles = [];
+fs.readdir(configFolderPath, (err, files) => {
+  files.forEach(file => {
+    if (file !== "profileDefault.ini" && file !== "settings.txt") {
+      savedProfiles.push(file);
+    }
+  });
+  createMenu();
+});
+
 // Event listener for when the application is ready
 app.on('ready', () => {
   // Load config before creating the window
   loadConfig(configPath);
-  
+
   // Now create the windows after their config is loaded
   createWindow();
   createOverlayWindow();
@@ -47,6 +64,9 @@ app.on('window-all-closed', () => {
 
 // Read the contents of config.ini into the state map variable
 function loadConfig(filePath) {
+  if (!fs.existsSync(filePath)) {
+    fs.copyFileSync(defaultProfilePath, filePath)
+  }
   const rawConfig = fs.readFileSync(filePath, 'utf-8');
   state = ini.parse(rawConfig);
 
@@ -89,13 +109,137 @@ function saveConfig(filePath) {
   fs.writeFileSync(filePath, iniString, 'utf-8');
 }
 
-
-
 /**
- * Function to create, initiate, and set properties of the main application window.
+ * Functions to create, initiate, and set properties and menu of the main application window.
  * Sets an interval to evaluate user-defined conditions, perform pixel checks and OCR every 1000ms 
  * Delivers results to the renderer through IPC.
  */
+
+// Build main window file menu
+const createMenu = () => {
+  const template = [
+    {
+      label: 'File',
+      submenu: [
+        { label: 'New Profile', click: newProfile },
+        { label: 'Open Profile', 
+          submenu: savedProfiles.map(profile => ({
+            label: profile.slice(0, -4),
+            click: () => openProfile(profile), // Function call with profile as argument
+          })), 
+        },
+        { label: 'Delete Profile', click: deleteProfile },
+        { Label: 'Exit', role: 'quit' }
+      ]
+    },
+  ];
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+};
+
+// Menu option to create a new profile (config .ini file) from default profile  
+function newProfile() {
+  // Find a novel filename
+  let index = 1;
+  let newProfile = `profile${index}.ini`;
+  while (savedProfiles.includes(newProfile)) {
+    newProfile = `profile${index}.ini`;
+    index++;
+  } 
+  // Update variables with new profile name
+  configPath = path.join(configFolderPath, `${newProfile}`);
+  fs.writeFileSync(settingsPath, newProfile, 'utf-8');
+  currentProfile = newProfile;
+  savedProfiles.push(newProfile);
+  createMenu();
+
+  // Copy default profile config settings into new profile and load into the state variable
+  fs.copyFileSync(defaultProfilePath, configPath);
+  loadConfig(configPath);
+
+  // Update variables in component representing configuration data for initially selected ocr region
+  state['ocrRegions'].selected.profile = newProfile.slice(0, -4);
+  state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
+  state['alerts'].selected.profile = newProfile.slice(0, -4);
+  state['conditions'].selected.profile = newProfile.slice(0, -4);
+  const selectedList = state['ocrRegions']['selected'];
+  win.webContents.send('updateList', { selectedList });
+  const selectedRegion = state['ocrRegions'].selected.regionSelected;
+  const selectedValues = state['ocrRegions'][selectedRegion];
+  win.webContents.send('updateConfig', { selectedValues });
+}
+
+// Menu option to open a saved config .ini file  
+function openProfile(newProfile) {
+  fs.writeFileSync(settingsPath, newProfile, 'utf-8');
+  currentProfile = newProfile;
+  configPath = path.join(configFolderPath, newProfile);
+  loadConfig(configPath);
+  state['ocrRegions'].selected.profile = newProfile.slice(0, -4);
+  state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
+  state['alerts'].selected.profile = newProfile.slice(0, -4);
+  state['conditions'].selected.profile = newProfile.slice(0, -4);
+
+  // Update variables in component representing configuration data for initially selected ocr region
+  const selectedList = state['ocrRegions']['selected'];
+  win.webContents.send('updateList', { selectedList });
+  const selectedRegion = state['ocrRegions'].selected.regionSelected;
+  const selectedValues = state['ocrRegions'][selectedRegion];
+  win.webContents.send('updateConfig', { selectedValues });
+}
+
+// Menu option to rename current config .ini file 
+ipcMain.on('renameProfile', (event, newProfile) => {  
+  if (savedProfiles.includes(newProfile)) {
+    return
+  } 
+
+  // Update variables with new profile name
+  const oldConfigPath = configPath;
+  configPath = path.join(configFolderPath, `${newProfile}`);
+  fs.copyFileSync(oldConfigPath, configPath);
+  fs.writeFileSync(settingsPath, newProfile, 'utf-8');
+  const index = savedProfiles.indexOf(currentProfile);
+  savedProfiles.splice(index, 1);
+  savedProfiles.push(newProfile);
+  currentProfile = newProfile;
+  createMenu();
+  state['ocrRegions'].selected.profile = newProfile.slice(0, -4);
+  state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
+  state['alerts'].selected.profile = newProfile.slice(0, -4);
+  state['conditions'].selected.profile = newProfile.slice(0, -4);
+  fs.unlinkSync(oldConfigPath);
+});
+
+// Menu option to delete current config .ini file 
+function deleteProfile() {
+  fs.unlinkSync(configPath);
+  const index = savedProfiles.indexOf(currentProfile);
+  savedProfiles.splice(index, 1);
+  createMenu();
+  if (savedProfiles.length > 0) {
+    // Update variables with newwly selected profile name if a profile remains in the list and load profile into the state variable
+    const newProfile = savedProfiles[0];
+    fs.writeFileSync(settingsPath, newProfile, 'utf-8');
+    configPath = path.join(configFolderPath, newProfile);
+    loadConfig(configPath);
+    state['ocrRegions'].selected.profile = newProfile.slice(0, -4);
+    state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
+    state['alerts'].selected.profile = newProfile.slice(0, -4);
+    state['conditions'].selected.profile = newProfile.slice(0, -4);
+    
+    // Update variables in component representing configuration data for initially selected ocr region
+    const selectedList = state['ocrRegions']['selected'];
+    win.webContents.send('updateList', { selectedList });
+    const selectedRegion = state['ocrRegions'].selected.regionSelected;
+    const selectedValues = state['ocrRegions'][selectedRegion];
+    win.webContents.send('updateConfig', { selectedValues });
+  } else {
+    // If no profiles remain create a new profile from default settings
+    newProfile();
+  }
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1100,
