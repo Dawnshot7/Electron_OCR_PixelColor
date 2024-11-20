@@ -8,7 +8,7 @@ const OCRAD = require('ocrad.js');  // OCRAD to perform OCR on screenshots
 const { createCanvas, Image } = require('canvas');  // Used to modify screenshot images before OCR 
 const { PNG } = require('pngjs'); // For handling PNG image format
 const { spawn } = require('child_process'); // AutoHotkey scripts are spawned with parameters, and return stdout
-const Jimp = require('jimp'); // Used to modify screenshot images before OCR 
+const sharp = require('sharp'); // Used to modify screenshot images before OCR 
 const ini = require('ini'); // Configuration data is stored in a .ini format between sessions
 
 let win; // Variable to hold the reference to the main application window
@@ -23,16 +23,16 @@ const basePath = isDev
 
 // Use basePath to construct all paths used in main.js
 const defaultProfilePath = path.join(basePath, 'config/profileDefault.ini');
-const unmodifiedImagePath = path.join(basePath, 'assets/unmodifiedImage.png');
-const modifiedImagePath = path.join(basePath, 'assets/modifiedImage.png');
 const pixelsDefaultImagePath = path.join(basePath, 'assets/pixelsDefault.png');
 const overlayHTMLPath = path.join(basePath, 'renderer/overlay.html');
 const indexHTMLPath = path.join(basePath, 'renderer/index.html');
+const unmodifiedImagePath = path.join(basePath, `assets/unmodifiedImage.png`);
+const modifiedImagePath = path.join(basePath, `assets/modifiedImage.png`);
 
 // Read saved selected profile from settings.txt to determine what configPath to use at initiation
 const settingsPath = path.join(basePath, 'config/settings.txt');
 let currentProfile = fs.readFileSync(settingsPath, 'utf-8').trim();
-const configFolderPath = path.join(basePath, 'config'); // Replace with your folder path
+const configFolderPath = path.join(basePath, 'config'); 
 let configPath = path.join(configFolderPath, `${currentProfile}`);
 
 // Collect the names of all available profiles to populate 'open profile' menu option
@@ -46,7 +46,7 @@ fs.readdir(configFolderPath, (err, files) => {
   createMenu();
 });
 
-// Component opened at initiation
+// Tracks currently open component tab
 let currentComponent = 'ocrRegions'
 
 // Event listener for when the application is ready
@@ -278,35 +278,54 @@ function createWindow() {
   // Load the HTML file for the renderer process
   win.loadFile(indexHTMLPath);
 
-  // Set an interval to monitor pixel color and OCR repeatedly
-  setInterval(async () => {
-    // Evaluate all conditions in state['conditions'] and send list of visible alerts to the overlay when game-mode is active
-    if (state['conditions']['selected'].live) {
-      const alertList = await evaluateConditions();
-      overlayWindow.webContents.send('updateVisibleAlerts', alertList);
-      console.log(`Alert list: `, alertList);
-    }  
-  
-    // Get the live pixel color from the selected pixel coordinate when Pixel Selector component live mode is active 
-    if (state['pixelCoords']['selected'].live) {
-      const selectedRegion = state['pixelCoords']['selected'].regionSelected
-      const selectedX = state['pixelCoords'][selectedRegion].x
-      const selectedY = state['pixelCoords'][selectedRegion].y
-      const liveColor = robot.getPixelColor(selectedX, selectedY);
-      win.webContents.send('pixelColor', { liveColor }); // Sending pixel data
+  // Initialize alert list used in evaluateConditions()
+  let previousAlertList = [];
+
+  // Define a function to handle repeated checks using setTimeout
+  async function checkConditions() {
+    try {
+      // Evaluate all conditions in state['conditions'] and send list of visible alerts to the overlay when game-mode is active
+      if (state['conditions']['selected'].live) {
+        const alertList = await evaluateConditions();
+        if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
+          overlayWindow.webContents.send('updateVisibleAlerts', alertList);
+          console.log(`Alert list: `, alertList);
+          previousAlertList = alertList;
+        }
+      }
+
+      // Get the live pixel color from the selected pixel coordinate when Pixel Selector component live mode is active
+      if (state['pixelCoords']['selected'].live) {
+        const selectedRegion = state['pixelCoords']['selected'].regionSelected;
+        const selectedX = state['pixelCoords'][selectedRegion].x;
+        const selectedY = state['pixelCoords'][selectedRegion].y;
+        const liveColor = robot.getPixelColor(selectedX, selectedY);
+        win.webContents.send('pixelColor', { liveColor }); // Sending pixel data
+      }
+
+      // Perform live OCR on the selected region when OCR Configurator component live mode is active
+      if (state['ocrRegions']['selected'].live) {
+        const selectedRegion = state['ocrRegions']['selected'].regionSelected;
+        const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][selectedRegion]);
+        win.webContents.send('ocrText', { ocrText }); // Sending OCR data
+
+        // Send the updated images
+        const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
+        const modifiedImageData = fs.readFileSync(modifiedImagePath);
+        win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
+      }
+    } catch (error) {
+      console.error("Error during condition evaluation:", error);
+    } finally {
+      // Schedule the next execution
+      setTimeout(checkConditions, 500); // 500ms delay
     }
-    // Perform live OCR on the selected region when OCR Configurator component live mode is active
-    if (state['ocrRegions']['selected'].live) {
-      const selectedRegion = state['ocrRegions']['selected'].regionSelected
-      const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][selectedRegion]);
-      win.webContents.send('ocrText', { ocrText }); // Sending OCR data
-      // Send the updated images
-      const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
-      const modifiedImageData = fs.readFileSync(modifiedImagePath);
-      win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
-    }
-  }, 1000); // Interval set to 1000 milliseconds 
+  }
+
+  // Start the checking loop
+  checkConditions();
 }
+
 
 // Create overlay window which will be displayed during gameplay
 function createOverlayWindow() {
@@ -341,8 +360,6 @@ function createOverlayWindow() {
 
 // Function to capture, save, and process screenshots
 async function captureAndProcessScreenshot(ocrRegion) {
-  // Capture the screen based on the passed ocrRegion
-
   try {
     // Capture the screen based on the passed ocrRegion and save the screenshot as PNG
     await captureScreenshotAsPNG(ocrRegion, unmodifiedImagePath);
@@ -350,49 +367,80 @@ async function captureAndProcessScreenshot(ocrRegion) {
     // Process and save the modified image as another PNG
     await processAndSaveModifiedImage(unmodifiedImagePath, modifiedImagePath, ocrRegion);
 
-    // Perform OCR on the modified image 
+    // Perform OCR on the modified image
     const text = await recognizeTextFromImage(modifiedImagePath);
     return text.trim(); // Return the recognized text
   } catch (error) {
     console.error('Error during OCR recognition:', error);
     return ''; // Return empty string in case of error
   }
+  // Function to validate the image file
+  function validateImage(imagePath) {
+    try {
+      const buffer = fs.readFileSync(imagePath);
+      const signature = buffer.toString('hex', 0, 8);
+      // Check PNG file signature: 89 50 4E 47 0D 0A 1A 0A
+      return signature === '89504e470d0a1a0a';
+    } catch (error) {
+      console.error(`Error validating image ${imagePath}:`, error);
+      return false;
+    }
+  }
 }
 
 // Capture screenshot as PNG
 function captureScreenshotAsPNG(captureRegion, filePath) {
-  // Capture the screen based on the passed capture region 
-  const screenshot = robot.screen.capture(captureRegion.x, captureRegion.y, captureRegion.width, captureRegion.height);
-
-  // Save screenshot as png
   return new Promise((resolve, reject) => {
-    const png = new PNG({ width: screenshot.width, height: screenshot.height });
-    png.data = Buffer.from(screenshot.image);
-    const buffer = PNG.sync.write(png);
+    try {
+      // Capture the screen based on the passed capture region
+      const screenshot = robot.screen.capture(
+        captureRegion.x,
+        captureRegion.y,
+        captureRegion.width,
+        captureRegion.height
+      );
 
-    fs.writeFile(filePath, buffer, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
+      // Save screenshot as PNG
+      const png = new PNG({ width: screenshot.width, height: screenshot.height });
+      png.data = Buffer.from(screenshot.image);
+      const buffer = PNG.sync.write(png);
+
+      fs.writeFile(filePath, buffer, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    } catch (error) {
+      reject(new Error(`Error capturing screenshot: ${error.message}`));
+    }
   });
 }
 
-// Process and save the modified image using Jimp according to user defined modification settings
+// Process and save the modified image using Sharp according to user-defined modification settings
 async function processAndSaveModifiedImage(inputPath, outputPath, { brightness, contrast, invert }) {
   try {
-    const image = await Jimp.read(inputPath);
+    let  image = sharp(inputPath);
+    const metadata = await image.metadata();
+    const originalWidth = metadata.width;
+    const originalHeight = metadata.height;
 
     // Apply transformations based on OCR region settings
-    if (invert) image.invert();
-    image.brightness((brightness*2) - 1); 
-    image.contrast((contrast*2)-1); 
-    image.resize(image.bitmap.width * 5, image.bitmap.height * 5, Jimp.RESIZE_HERMITE);
-    image.greyscale();
-
+    if (invert) image = image.negate();
+    process.nextTick(() => {
+    image = image
+      .greyscale()
+      .modulate({
+        brightness: brightness * 2, // Adjust scale to match Sharp's settings
+        contrast: contrast * 2 - 1,
+      })
+      .resize({ width: 5 * originalWidth, height: 5 * originalHeight, kernel: 'mitchell' }); // Replace 'nearest' with 'cubic' for better quality
+    });
+    
     // Save the modified image
-    await image.writeAsync(outputPath);
+    await image.toFile(outputPath);
+    await new Promise(resolve => setTimeout(resolve, 100)); // Add delay to allow disk write completion  } catch (error) {
   } catch (error) {
     console.error('Error processing and saving modified image:', error);
+    throw new Error(`Processing error: ${error.message}`);
   }
 }
 
@@ -405,13 +453,17 @@ function recognizeTextFromImage(imagePath) {
 
       // Wait for the image to load before processing
       img.onload = () => {
-        const canvas = createCanvas(img.width, img.height);
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, img.width, img.height);
+        try {
+          const canvas = createCanvas(img.width, img.height);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, img.width, img.height);
 
-        // Use OCRAD to process the canvas directly
-        const text = OCRAD(canvas);
-        resolve(text); // Resolve with the recognized text
+          // Use OCRAD to process the canvas directly
+          const text = OCRAD(canvas);
+          resolve(text); // Resolve with the recognized text
+        } catch (error) {
+          reject(new Error(`Error during OCR processing: ${error.message}`));
+        }
       };
 
       // Handle image loading errors
@@ -421,81 +473,96 @@ function recognizeTextFromImage(imagePath) {
 
       // Set the image source to trigger loading
       img.src = src;
-    } catch (err) {
-      reject(new Error(`Error reading image: ${err.message}`));
+    } catch (error) {
+      reject(new Error(`Error reading image: ${error.message}`));
     }
   });
 }
+
 
 // Function to evaluate user-defined conditions for alert visibility by performing OCR and checking pixel colors
 async function evaluateConditions() {
   const alerts = []; // Store triggered alerts which will be made visible
 
-  // Loop through each condition in the state['conditions']
-  for (const conditionKey in state['conditions']) {
-    const condition = state['conditions'][conditionKey];
+  // Helper function to evaluate a single condition
+  const evaluateCondition = async (conditionKey, condition) => {
+    // Ignore settings keys which don't contain a condition
+    if (conditionKey === 'selected' || conditionKey === 'conditionsDefault') return null;
 
     // Alert will be shown if truecount is greater than 0 and falsecount equals 0
     let truecount = 0;
     let falsecount = 0;
 
-    // Ignore settings keys which don't contain a condition
-    if (conditionKey === 'selected' || conditionKey === 'conditionsDefault') {
-      continue;
-    }
-
     // Evaluate OCR region text with regex if the user included an OCR region in this condition
     if (condition.ocrRegions) {
       // Perform OCR within the specified region
-      const ocrRegion = condition.ocrRegions;
-      const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][ocrRegion]);
+      const ocrRegionData = state['ocrRegions'][condition.ocrRegions];
+      if (ocrRegionData) {
+        const ocrText = await captureAndProcessScreenshot(ocrRegionData);
 
-      // Check if OCR result matches the regex
-      const regex = new RegExp(condition.regex);
-      const match = ocrText.match(regex);
+        // Check if OCR result matches the regex
+        if (ocrText) {
+          const regex = new RegExp(condition.regex);
+          const match = ocrText.match(regex);
 
-      if (match) {
-        // Loop through each array in condition.matches and perform the requested comparison against the corresponding match group
-        for (let i = 0; i < condition.matches.length; i++) {
-          const target = condition.matches[i]; // Target[0] is comparison type. Target[1] is text to compare against the match group. target[2] is only populated if the 'between' comparison is chosen
-          const matchedText = match[i + 1]; // Match group text
+          if (match) {
+            // Loop through each array in condition.matches and perform the requested comparison against the corresponding match group
+            for (const target of condition.matches) {
+              const matchedText = match[target.matchGroupIndex || 1]; // Match group text
 
-          // Perform comparison based on the specified comparison type
-          switch (target[0]) {
-            case 'equals':
-              matchedText === target[1] ? truecount++ : falsecount++;
-              break;
-            case 'notEquals':
-              matchedText !== target[1] ? truecount++ : falsecount++;
-              break;
-            case 'lessThan':
-              parseInt(matchedText, 10) <  parseInt(target[1], 10) ? truecount++ : falsecount++;
-              break;
-            case 'greaterThan':
-              parseInt(matchedText, 10) > parseInt(target[1], 10) ? truecount++ : falsecount++;
-              break;
-            case 'between':
-              parseInt(matchedText, 10) > parseInt(target[1], 10) && parseInt(matchedText, 10) < parseInt(target[2], 10) ? truecount++ : falsecount++;
-              break;
-            default:
-              console.warn(`Unknown comparison type: ${target[0]}`);
+              // Perform comparison based on the specified comparison type (structured to reduce cpu usage)
+              // target[0] is comparison type. 
+              // target[1] is text to compare against the match group. 
+              // target[2] is only populated if the 'between' comparison is chosen
+              switch (target[0]) {
+                case 'equals':
+                  truecount += matchedText === target[1] ? 1 : 0;
+                  falsecount += matchedText !== target[1] ? 1 : 0;
+                  break;
+                case 'notEquals':
+                  truecount += matchedText !== target[1] ? 1 : 0;
+                  falsecount += matchedText === target[1] ? 1 : 0;
+                  break;
+                case 'lessThan':
+                case 'greaterThan':
+                case 'between': {
+                  const numericValue = parseInt(matchedText, 10);
+                  const target1 = parseInt(target[1], 10);
+                  const target2 = parseInt(target[2] || 0, 10);
+
+                  if (isNaN(numericValue)) break;
+
+                  if (
+                    (target[0] === 'lessThan' && numericValue < target1) ||
+                    (target[0] === 'greaterThan' && numericValue > target1) ||
+                    (target[0] === 'between' && numericValue >= target1 && numericValue <= target2)
+                  ) {
+                    truecount++;
+                  } else {
+                    falsecount++;
+                  }
+                  break;
+                }
+                default:
+                  console.warn(`Unknown comparison type: ${target[0]}`);
+              }
+            }
           }
         }
-
       }
     }
 
-    // Evaluate match status of listed pixel's color if the user included an pixel coordinates in this condition
+    // Evaluate match status of listed pixel's color if the user included an pixel coordinates in this condition    
     if (condition.pixelCoords.length > 0) {
       for (let i = 0; i < condition.pixelCoords.length; i++) {
         const pixelCoord = condition.pixelCoords[i]; // Which pixel to check
         const { x, y, color } = state['pixelCoords'][pixelCoord];
         const comparison = condition.pixelComparison[i]; // Equals or not equals
+
+        // Check current color and perform the specified comparison against the stored color
         if (x && y) {
-          // Get the color at specified pixel using RobotJS
           const colorAtPixel = robot.getPixelColor(x, y);
 
-          // Check current color and perform the specified comparison against the stored color
           if (comparison === "equals" && colorAtPixel === color) {
             truecount++;
           } else if (comparison === "notEquals" && colorAtPixel !== color) {
@@ -507,13 +574,30 @@ async function evaluateConditions() {
       }
     }
 
-    // If all conditions for this alert are met, add it to alerts array to be made visible in overlay
+    // If all conditions for this alert are met, add it to alerts array to be made visible in overlay    if (truecount > 0 && falsecount === 0) {
     if (truecount > 0 && falsecount === 0) {
-      alerts.push(condition.alert);
+        return condition.alert;
     }
-  }
+
+    return null;
+  };
+
+  // Map conditions to promises for evaluation
+  const evaluationPromises = Object.entries(state['conditions']).map(([key, condition]) =>
+    evaluateCondition(key, condition)
+  );
+
+  // Wait for all condition evaluations to complete
+  const results = await Promise.all(evaluationPromises);
+
+  // Filter out null values and collect alerts
+  results.forEach(result => {
+    if (result) alerts.push(result);
+  });
+
   return alerts;
 }
+
 
 // Run Autohotkey scripts to capture user mouse clicks to select coordinates. 
 ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
