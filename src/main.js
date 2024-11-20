@@ -8,7 +8,7 @@ const OCRAD = require('ocrad.js');  // OCRAD to perform OCR on screenshots
 const { createCanvas, Image } = require('canvas');  // Used to modify screenshot images before OCR 
 const { PNG } = require('pngjs'); // For handling PNG image format
 const { spawn } = require('child_process'); // AutoHotkey scripts are spawned with parameters, and return stdout
-const sharp = require('sharp'); // Used to modify screenshot images before OCR 
+const Jimp = require('jimp'); // Used to modify screenshot images before OCR 
 const ini = require('ini'); // Configuration data is stored in a .ini format between sessions
 
 let win; // Variable to hold the reference to the main application window
@@ -418,25 +418,30 @@ function captureScreenshotAsPNG(captureRegion, filePath) {
 // Process and save the modified image using Sharp according to user-defined modification settings
 async function processAndSaveModifiedImage(inputPath, outputPath, { brightness, contrast, invert }) {
   try {
-    let  image = sharp(inputPath);
-    const metadata = await image.metadata();
-    const originalWidth = metadata.width;
-    const originalHeight = metadata.height;
+    const image = await Jimp.read(inputPath);
 
-    // Apply transformations based on OCR region settings
-    if (invert) image = image.negate();
-    process.nextTick(() => {
-    image = image
-      .greyscale()
-      .modulate({
-        brightness: brightness * 2, // Adjust scale to match Sharp's settings
-        contrast: contrast * 2 - 1,
-      })
-      .resize({ width: 5 * originalWidth, height: 5 * originalHeight, kernel: 'mitchell' }); // Replace 'nearest' with 'cubic' for better quality
-    });
-    
+    const originalWidth = image.getWidth();
+    const originalHeight = image.getHeight();
+
+    // Apply transformations based on OCR region settings. When in game-mode use process.nextTick for efficiency.
+    if (state.conditions.selected.live) {
+      process.nextTick(() => {
+        if (invert) image.invert();
+        image.greyscale();
+        image.brightness((brightness * 2) - 1);
+        image.contrast((contrast * 2) - 1);
+        image.resize(originalWidth * 5, originalHeight * 5, Jimp.RESIZE_HERMITE);
+      });
+    } else {
+      if (invert) image.invert();
+      image.greyscale();
+      image.brightness((brightness * 2) - 1);
+      image.contrast((contrast * 2) - 1);
+      image.resize(originalWidth * 5, originalHeight * 5, Jimp.RESIZE_HERMITE);
+    }
+
     // Save the modified image
-    await image.toFile(outputPath);
+    await image.writeAsync(outputPath);
     await new Promise(resolve => setTimeout(resolve, 100)); // Add delay to allow disk write completion  } catch (error) {
   } catch (error) {
     console.error('Error processing and saving modified image:', error);
@@ -735,7 +740,7 @@ async function updateComponents(variableName) {
   region = state[variableName]['selected'].regionSelected
   const regionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${region}.png`);
 
-  if (variableName === 'ocrRegions') {
+  if (variableName === 'ocrRegions' && !state.ocrRegions.selected.live) {
     // Perform OCR and send the recognized text after each config change
     await processAndSaveModifiedImage(regionImagePath, modifiedImagePath, state[variableName][region]);
     const ocrText = await recognizeTextFromImage(modifiedImagePath);
