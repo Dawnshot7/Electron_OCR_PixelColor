@@ -286,12 +286,14 @@ function createWindow() {
     try {
       // Evaluate all conditions in state['conditions'] and send list of visible alerts to the overlay when game-mode is active
       if (state['conditions']['selected'].live) {
+  
         const alertList = await evaluateConditions();
-        if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
+
+        //if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
           overlayWindow.webContents.send('updateVisibleAlerts', alertList);
           console.log(`Alert list: `, alertList);
           previousAlertList = alertList;
-        }
+        //}
       }
 
       // Get the live pixel color from the selected pixel coordinate when Pixel Selector component live mode is active
@@ -373,18 +375,6 @@ async function captureAndProcessScreenshot(ocrRegion) {
   } catch (error) {
     console.error('Error during OCR recognition:', error);
     return ''; // Return empty string in case of error
-  }
-  // Function to validate the image file
-  function validateImage(imagePath) {
-    try {
-      const buffer = fs.readFileSync(imagePath);
-      const signature = buffer.toString('hex', 0, 8);
-      // Check PNG file signature: 89 50 4E 47 0D 0A 1A 0A
-      return signature === '89504e470d0a1a0a';
-    } catch (error) {
-      console.error(`Error validating image ${imagePath}:`, error);
-      return false;
-    }
   }
 }
 
@@ -487,12 +477,11 @@ function recognizeTextFromImage(imagePath) {
 
 // Function to evaluate user-defined conditions for alert visibility by performing OCR and checking pixel colors
 async function evaluateConditions() {
-  const alerts = []; // Store triggered alerts which will be made visible
-
+  let alerts = [];
   // Helper function to evaluate a single condition
-  const evaluateCondition = async (conditionKey, condition) => {
+  for (const [conditionKey, condition] of Object.entries(state['conditions'])) {
     // Ignore settings keys which don't contain a condition
-    if (conditionKey === 'selected' || conditionKey === 'conditionsDefault') return null;
+    if (conditionKey === 'selected' || conditionKey === 'conditionsDefault') continue;
 
     // Alert will be shown if truecount is greater than 0 and falsecount equals 0
     let truecount = 0;
@@ -535,7 +524,10 @@ async function evaluateConditions() {
                   const target1 = parseInt(target[1], 10);
                   const target2 = parseInt(target[2] || 0, 10);
 
-                  if (isNaN(numericValue)) break;
+                  if (isNaN(numericValue)) {
+                    falsecount++;
+                    break;
+                  }
 
                   if (
                     (target[0] === 'lessThan' && numericValue < target1) ||
@@ -550,10 +542,18 @@ async function evaluateConditions() {
                 }
                 default:
                   console.warn(`Unknown comparison type: ${target[0]}`);
+                  falsecount++;
+                  break;
               }
             }
+          } else { 
+            falsecount++; 
           }
+        } else { 
+          falsecount++; 
         }
+      } else { 
+        falsecount++; 
       }
     }
 
@@ -578,28 +578,11 @@ async function evaluateConditions() {
         }
       }
     }
-
     // If all conditions for this alert are met, add it to alerts array to be made visible in overlay    if (truecount > 0 && falsecount === 0) {
     if (truecount > 0 && falsecount === 0) {
-        return condition.alert;
+      alerts.push(condition.alert);
     }
-
-    return null;
-  };
-
-  // Map conditions to promises for evaluation
-  const evaluationPromises = Object.entries(state['conditions']).map(([key, condition]) =>
-    evaluateCondition(key, condition)
-  );
-
-  // Wait for all condition evaluations to complete
-  const results = await Promise.all(evaluationPromises);
-
-  // Filter out null values and collect alerts
-  results.forEach(result => {
-    if (result) alerts.push(result);
-  });
-
+  }  
   return alerts;
 }
 

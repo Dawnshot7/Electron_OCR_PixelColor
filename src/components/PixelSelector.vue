@@ -37,7 +37,7 @@
           class="list-group-item list-group-item-action text-center add-region-btn bold-btn bg-light mt-2"
           style="background-color: #797979; width: 100%;"
         >
-          Add Region
+          Add Pixel
         </button>
 
         <!-- Render the "Delete Region" button always visible below the list -->
@@ -46,7 +46,7 @@
           class="list-group-item list-group-item-action text-center delete-region-btn bold-btn mt-2"
           style="margin-top: 25px; background-color: #dc3545; width: 100%;"
         >
-          Delete Region
+          Delete Pixel
         </button>
       </b-col>
 

@@ -37,7 +37,7 @@
           class="list-group-item list-group-item-action text-center add-region-btn bold-btn bg-light mt-2"
           style="background-color: #797979; width: 100%;"
         >
-          Add Region
+          Add Condition
         </button>
 
         <!-- Render the "Delete Region" button always visible below the list -->
@@ -46,7 +46,7 @@
           class="list-group-item list-group-item-action text-center delete-region-btn bold-btn mt-2"
           style="margin-top: 25px; background-color: #dc3545; width: 100%;"
         >
-          Delete Region
+          Delete Condition
         </button>
       </b-col>
 
@@ -66,13 +66,13 @@
               class="mb-2"
               >
               <b-row>
-                <b-col cols="4">
+                <b-col cols="6">
                 <b-form-select
                   v-model="conditionConfig.pixelCoords[index]"
                   :options="conditionList.pixelRegions"
                 ></b-form-select>
                 </b-col>
-                <b-col cols="4">
+                <b-col cols="6">
                 <b-form-select
                   v-model="conditionConfig.pixelComparison[index]"
                   :options="['equals', 'notEquals']"
@@ -119,7 +119,7 @@
 
               <!-- User inputs for match comparison type and match text for each match group in regex (Dynamic fields can be added with the add matches button below) -->
               <div>
-                <h5>Matches (no backslashes)</h5>
+                <h5>Matches</h5>
                 <div
                 v-for="(match, index) in conditionConfig.matches"
                 :key="`match-${index}`"
