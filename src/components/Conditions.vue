@@ -86,6 +86,21 @@
               <b-button @click="deletePixelCoord" variant="success" size="sm" >Remove Pixel</b-button>
             </div>
 
+            <!-- Select alert that will be shown when condition is true -->
+            <h4 :style="{ marginTop: '20px' }">Alert Choice</h4>
+            <b-form-group label="Alert">
+              <b-form-select
+              v-model="conditionConfig.alert"
+              :options="conditionList.alertRegions"
+              ></b-form-select>
+            </b-form-group>
+
+            <!-- Select alert that will be shown when condition is true -->
+            <h4 :style="{ marginTop: '20px' }">Suppression Option</h4>
+            <b-form-group label="Condition hides alert for this many seconds">
+              <b-form-input v-model="conditionConfig.timer" placeholder="">0</b-form-input>
+            </b-form-group>
+
             <!-- Toggle overlay button -->
             <b-row class="d-flex justify-content-center">
               <b-button @click="toggleGameModeOverlay" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Toggle Game-mode Overlay</b-button>
@@ -158,14 +173,6 @@
               </div>
             </div>
 
-            <!-- Select alert that will be shown when condition is true -->
-            <h4 :style="{ marginTop: '20px' }">Alert Choice</h4>
-            <b-form-group label="Alert">
-              <b-form-select
-              v-model="conditionConfig.alert"
-              :options="conditionList.alertRegions"
-              ></b-form-select>
-            </b-form-group>
           </b-col>
 
         </b-row>
@@ -194,7 +201,10 @@
         matches: [],
         pixelCoords: [''],
         pixelComparison: [],
-        alert: ''
+        alert: '',
+        timer: 0,
+        startTime: 0,
+        resetNeeded: false
       }
     };
   },

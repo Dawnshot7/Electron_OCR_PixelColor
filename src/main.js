@@ -474,7 +474,6 @@ function recognizeTextFromImage(imagePath) {
   });
 }
 
-
 // Function to evaluate user-defined conditions for alert visibility by performing OCR and checking pixel colors
 async function evaluateConditions() {
   let alerts = [];
@@ -486,13 +485,13 @@ async function evaluateConditions() {
     // Alert will be shown if truecount is greater than 0 and falsecount equals 0
     let truecount = 0;
     let falsecount = 0;
-
+    let ocrText = '';
     // Evaluate OCR region text with regex if the user included an OCR region in this condition
     if (condition.ocrRegions) {
       // Perform OCR within the specified region
       const ocrRegionData = state['ocrRegions'][condition.ocrRegions];
       if (ocrRegionData) {
-        const ocrText = await captureAndProcessScreenshot(ocrRegionData);
+        ocrText = await captureAndProcessScreenshot(ocrRegionData);
 
         // Check if OCR result matches the regex
         if (ocrText) {
@@ -560,32 +559,49 @@ async function evaluateConditions() {
     // Evaluate match status of listed pixel's color if the user included an pixel coordinates in this condition    
     if (condition.pixelCoords.length > 0) {
       for (let i = 0; i < condition.pixelCoords.length; i++) {
-        const pixelCoord = condition.pixelCoords[i]; // Which pixel to check
+        const pixelCoord = condition.pixelCoords[i];
         const { x, y, color } = state['pixelCoords'][pixelCoord];
-        const comparison = condition.pixelComparison[i]; // Equals or not equals
-
-        // Check current color and perform the specified comparison against the stored color
+        const comparison = condition.pixelComparison[i];
+        
+		
         if (x && y) {
           const colorAtPixel = robot.getPixelColor(x, y);
-
-          if (comparison === "equals" && colorAtPixel === color) {
-            truecount++;
-          } else if (comparison === "notEquals" && colorAtPixel !== color) {
-            truecount++;
-          } else {
-            falsecount++;
-          }
-        }
-      }
+          const matches = (comparison === "equals" && colorAtPixel === color) || 
+                          (comparison === "notEquals" && colorAtPixel !== color);
+          if (matches) truecount++;
+          else falsecount++;
+        } 
+      }   
     }
-    // If all conditions for this alert are met, add it to alerts array to be made visible in overlay    if (truecount > 0 && falsecount === 0) {
-    if (truecount > 0 && falsecount === 0) {
+
+    // Suppress alerts for conditions on a suppression timer, otherwise evaluate alert display status based on truecount and falsecount.
+    let now = Date.now();
+    const duration = parseInt(condition.timer, 10);
+    if (duration > 0) {
+      // Condition evaluating true triggers alert suppresion for a duration. Needs reset by evaluating false after each true evaluation.
+      if ((truecount > 0 && falsecount === 0) && !condition.resetNeeded) { // Reset is not currently needed and condition is triggered
+        condition.resetNeeded = true;
+        state['conditions'][conditionKey].startTime = now; // For duration of timer falsecount++ will be applied in suppression section below
+      } else if (!(truecount > 0 && falsecount === 0) && condition.resetNeeded) { 
+        condition.resetNeeded = false; // Reset was needed, and reset is applied because !matches.
+      } 
+
+      if (condition.startTime > 0) {
+        const elapsed = (now - condition.startTime) / 1000; // Convert to seconds
+        if (elapsed >= duration) {
+          state['conditions'][conditionKey].startTime = 0;
+          alerts.push(condition.alert);
+        }
+      } else {
+        alerts.push(condition.alert);
+      }
+    } 
+    else if (truecount > 0 && falsecount === 0) { // If all conditions for this alert are met, add it to alerts array to be made visible in overlay    
       alerts.push(condition.alert);
     }
   }  
   return alerts;
 }
-
 
 // Run Autohotkey scripts to capture user mouse clicks to select coordinates. 
 ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
