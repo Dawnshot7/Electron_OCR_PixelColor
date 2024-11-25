@@ -74,7 +74,7 @@ function loadConfig(filePath) {
   state = ini.parse(rawConfig);
 
   // Parse .ini values saved as JSON strings into a map
-  for (const section of ['ocrRegions', 'pixelCoords', 'alerts', 'conditions']) {
+  for (const section of ['ocrRegions', 'pixelCoords', 'alerts', 'conditions', 'automation']) {
     for (const key in state[section]) {
       try {
         state[section][key] = JSON.parse(state[section][key]);
@@ -266,7 +266,7 @@ async function deleteProfile() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1100,
+    width: 1300, //1100 without dev tools
     height: 700,
     webPreferences: {
       nodeIntegration: false,
@@ -277,7 +277,7 @@ function createWindow() {
 
   // Load the HTML file for the renderer process
   win.loadFile(indexHTMLPath);
-
+  win.webContents.openDevTools();
   // Initialize alert list used in evaluateConditions()
   let previousAlertList = [];
 
@@ -286,14 +286,13 @@ function createWindow() {
     try {
       // Evaluate all conditions in state['conditions'] and send list of visible alerts to the overlay when game-mode is active
       if (state['conditions']['selected'].live) {
-  
         const alertList = await evaluateConditions();
-
-        //if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
+        // Only update overlay if alertList has changed
+        if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
           overlayWindow.webContents.send('updateVisibleAlerts', alertList);
           console.log(`Alert list: `, alertList);
           previousAlertList = alertList;
-        //}
+        }
       }
 
       // Get the live pixel color from the selected pixel coordinate when Pixel Selector component live mode is active
@@ -575,7 +574,7 @@ async function evaluateConditions() {
     }
 
     // Suppress alerts for conditions on a suppression timer, otherwise evaluate alert display status based on truecount and falsecount.
-    let now = Date.now();
+    const now = Date.now();
     const duration = parseInt(condition.timer, 10);
     if (duration > 0) {
       // Condition evaluating true triggers alert suppresion for a duration. Needs reset by evaluating false after each true evaluation.
@@ -765,6 +764,11 @@ async function updateComponents(variableName) {
     state['conditions']['selected'].pixelRegions = state['pixelCoords']['selected'].regions;
     state['conditions']['selected'].alertRegions = state['alerts']['selected'].regions;
   }
+  // Updates variables in component used to populate listboxes
+  if (variableName === 'automation') {
+    // The conditions automation needs these additional arrays to populate it's dropdown listboxes
+    state['automation']['selected'].alertRegions = state['alerts']['selected'].regions;
+  }
   const selectedList = state[variableName]['selected'];
   win.webContents.send('updateList', { selectedList });
 
@@ -772,6 +776,7 @@ async function updateComponents(variableName) {
   const selectedRegion = state[variableName].selected.regionSelected;
   const selectedValues = state[variableName][selectedRegion];
   win.webContents.send('updateConfig', { selectedValues });
+  //console.log(`Sent Config: `, JSON.stringify(selectedValues, null, 2));
 }
 
 // IPC listener to show overlay with draggable controls

@@ -69,6 +69,12 @@
       >
         Conditions
       </b-nav-item>
+      <b-nav-item 
+        @click="currentTab = 'Automation'" 
+        :active="currentTab === 'Automation'"
+      >
+        Automation
+      </b-nav-item>
 
     </b-nav>
 
@@ -85,6 +91,7 @@ import OCRConfigurator from './OCRConfigurator.vue'; // Handles OCR region confi
 import PixelSelector from './PixelSelector.vue'; // Manages pixel selection for color monitoring by conditions
 import AlertDesigner from './AlertDesigner.vue'; // Designs on-screen alerts to be triggered by conditions 
 import Conditions from './Conditions.vue'; // Configures logical conditions for display of alerts
+import Automation from './Automation.vue'; // Configures logical conditions for display of alerts
 
 export default {
   name: 'App', // Main application container
@@ -94,6 +101,7 @@ export default {
     PixelSelector,
     AlertDesigner,
     Conditions,
+    Automation,
   },
   data() {
     return {
@@ -116,6 +124,8 @@ export default {
           return AlertDesigner; 
         case 'Conditions':
           return Conditions; 
+        case 'Automation':
+          return Automation; 
         default:
           return null; // Fallback if no valid tab is selected
       }
