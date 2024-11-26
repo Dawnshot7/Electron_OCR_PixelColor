@@ -159,7 +159,6 @@ export default {
       // Change alert being displayed and have main.js send back the new alert's config data
       this.alertList.regionSelected = newSelection;
       window.electronAPI.updateVariable('alerts', 'selected', { regionSelected: newSelection });
-      window.electronAPI.updateVariable('alerts', 'selected', { regions: this.alertList.regions });
     },
     addRegion() {
       // Add a new alert to the listbox
@@ -206,8 +205,8 @@ export default {
     window.electronAPI.updateVariable('alerts', 'selected', { live: false });
 
     // Listen for variable updates to populate the form fields
-    window.electronAPI.onupdateConfig(({ selectedValues }) => {
-      if (selectedValues) {
+    window.electronAPI.onupdateConfig(({ component, selectedValues }) => {
+      if (selectedValues && component === 'alerts') {
         // Populate fields from selectedList
         this.alertConfig = { ...this.alertConfig, ...selectedValues };
         console.log('Received config');
@@ -215,8 +214,8 @@ export default {
     });
 
     // Listen for updates to populate the list box 
-    window.electronAPI.onupdateList(({ selectedList }) => {
-      if (selectedList) {
+    window.electronAPI.onupdateList(({ component, selectedList }) => {
+      if (selectedList && component === 'alerts') {
         this.alertList = { ...this.alertList, ...selectedList };
         console.log('Received list');
       }

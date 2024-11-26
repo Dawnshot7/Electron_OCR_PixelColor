@@ -97,7 +97,7 @@
 
             <!-- Select alert that will be shown when condition is true -->
             <h4 :style="{ marginTop: '20px' }">Suppression Option</h4>
-            <b-form-group label="Condition hides alert for this many seconds">
+            <b-form-group label="Condition hides alert for this many seconds:">
               <b-form-input v-model="conditionConfig.timer" placeholder="">0</b-form-input>
             </b-form-group>
 
@@ -211,6 +211,7 @@
   methods: {
     regionChange(newSelection) {
       // Change condition being displayed and have main.js send back the new box's config data
+      this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
       const serializableConfig = toRaw(this.conditionConfig);
       window.electronAPI.updateVariable('conditions', this.conditionList.regionSelected, serializableConfig );
       this.conditionList.regionSelected = newSelection;
@@ -256,6 +257,7 @@
     },
 	  toggleGameModeOverlay() {
       // Display overlay.html in game-mode (ignoreMouseEvents=true, running condition evaluator in main.js setinterval)
+      this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
       const serializableConfig = toRaw(this.conditionConfig);
       // Submits all fields and sends to main.js to update config.ini
       window.electronAPI.updateVariable('conditions', this.conditionList.regionSelected, serializableConfig );
@@ -269,17 +271,18 @@
     window.electronAPI.updateVariable('conditions', 'selected', {});
     
     // Listen for variable updates to populate the form fields
-    window.electronAPI.onupdateConfig(({ selectedValues }) => {
-      if (selectedValues) {
+    window.electronAPI.onupdateConfig(({ component, selectedValues }) => {
+      if (selectedValues && component === 'conditions') {
         // Populate fields from selectedValues
         this.conditionConfig = { ...this.conditionConfig, ...selectedValues };
+        this.conditionConfig.regex = this.conditionConfig.regex.replace(/~/g, '\\');
         console.log(`received config`, selectedValues.color);
       }
     });
 
     // Listen for updates to populate the list box 
-    window.electronAPI.onupdateList(({ selectedList }) => {
-      if (selectedList) {
+    window.electronAPI.onupdateList(({ component, selectedList }) => {
+      if (selectedList && component === 'conditions') {
         // Populate fields from selectedList
         this.conditionList = { ...this.conditionList, ...selectedList };
         console.log('received list');
@@ -288,6 +291,7 @@
   },
   unmounted() {
     // Submits all fields and sends to main.js to update config.ini
+    this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
     const serializableConfig = toRaw(this.conditionConfig);
     window.electronAPI.updateVariable('conditions', this.conditionList.regionSelected, serializableConfig );
   }

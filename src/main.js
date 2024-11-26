@@ -93,13 +93,14 @@ function saveConfig(filePath) {
   // Loop through each section in the state variable
   for (let section in state) {
     if (state.hasOwnProperty(section)) {
-      configForIni[section] = {};  // Create the section
+      configForIni[section] = {}; // Create the section
 
       // Iterate through each key-value pair in the section
       for (let key in state[section]) {
         if (state[section].hasOwnProperty(key)) {
-          // Convert each value to a JSON string for storage in ini format
-          configForIni[section][key] = JSON.stringify(state[section][key]);
+          const value = state[section][key];
+          // Use JSON.stringify for objects/arrays
+          configForIni[section][key] = JSON.stringify(value);
         }
       }
     }
@@ -174,6 +175,7 @@ async function newProfile() {
   state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
   state['alerts'].selected.profile = newProfile.slice(0, -4);
   state['conditions'].selected.profile = newProfile.slice(0, -4);
+  state['automation'].selected.profile = newProfile.slice(0, -4);
   saveConfig(configPath);  
 
   // Function to use new config to reperform ocr and update component variables and images 
@@ -227,6 +229,7 @@ ipcMain.on('renameProfile', async (event, newProfile) => {
   state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
   state['alerts'].selected.profile = newProfile.slice(0, -4);
   state['conditions'].selected.profile = newProfile.slice(0, -4);
+  state['automation'].selected.profile = newProfile.slice(0, -4);
   saveConfig(configPath);  
 });
 
@@ -255,6 +258,7 @@ async function deleteProfile() {
     state['pixelCoords'].selected.profile = newProfile.slice(0, -4);
     state['alerts'].selected.profile = newProfile.slice(0, -4);
     state['conditions'].selected.profile = newProfile.slice(0, -4);
+    state['automation'].selected.profile = newProfile.slice(0, -4);
     
     // Function to use new config to reperform ocr and update component variables and images 
     updateComponents(currentComponent);
@@ -266,7 +270,7 @@ async function deleteProfile() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1300, //1100 without dev tools
+    width: 1100, 
     height: 700,
     webPreferences: {
       nodeIntegration: false,
@@ -278,6 +282,7 @@ function createWindow() {
   // Load the HTML file for the renderer process
   win.loadFile(indexHTMLPath);
   win.webContents.openDevTools();
+
   // Initialize alert list used in evaluateConditions()
   let previousAlertList = [];
 
@@ -292,6 +297,9 @@ function createWindow() {
           overlayWindow.webContents.send('updateVisibleAlerts', alertList);
           console.log(`Alert list: `, alertList);
           previousAlertList = alertList;
+        }
+        if (state['automation']['selected'].live) {
+          console.log(automate(alertList));
         }
       }
 
@@ -494,7 +502,9 @@ async function evaluateConditions() {
 
         // Check if OCR result matches the regex
         if (ocrText) {
-          const regex = new RegExp(condition.regex);
+          // Replace ~ with \ in the regex pattern
+          const sanitizedRegex = condition.regex.replace(/~/g, '\\');
+          const regex = new RegExp(sanitizedRegex);
           const match = ocrText.match(regex);
 
           if (match) {
@@ -602,6 +612,89 @@ async function evaluateConditions() {
   return alerts;
 }
 
+// Main automate function
+async function automate(alertList) {
+  const automationSettings = state['automation']['automation1'];
+  const gcd = automationSettings.gcd || 1.5;
+  const operationsList = automationSettings.operationsList;
+  
+  // Evaluates the operations to find a matching button
+  const evaluateOperations = () => {
+    for (let i = 0; i < operationsList.length - 1; i++) {
+      const [alertsToCheck, condition, button] = operationsList[i];
+
+      if (!button) continue; // Skip operations with no button defined
+
+      // Parse and evaluate the condition
+      const conditionsMet = parseAndEvaluateCondition(condition, alertsToCheck, alertList);
+
+      if (conditionsMet) {
+        return button; // Return the button if the condition is met
+      }
+    }
+
+    // Default action: return the button of the last operation
+    return operationsList[operationsList.length - 1][2];
+  };
+
+  /**
+   * Parse and evaluate a condition string safely using dynamic functions.
+   * @param {string} conditionString - The user-defined condition.
+   * @param {Array} alertsToCheck - The subset of alerts to evaluate.
+   * @param {Array} alertList - The list of currently active alerts.
+   * @returns {boolean} - True if the condition is met, false otherwise.
+   */
+  function parseAndEvaluateCondition(conditionString, alertsToCheck, alertList) {
+    // Step 1: Sanitize the input to prevent code injection
+    const sanitizedCondition = sanitizeCondition(conditionString);
+    if (!sanitizedCondition) {
+      console.error("Invalid condition syntax:", conditionString);
+      return false; // Return false for invalid conditions
+    }
+
+    // Step 2: Replace alert indices with their evaluation logic
+    const conditionWithLogic = replaceAlertIndices(sanitizedCondition, alertsToCheck, alertList);
+
+    // Step 3: Create a dynamic function to evaluate the condition
+    try {
+      const conditionFunction = new Function(`return ${conditionWithLogic};`);
+      return conditionFunction(); // Evaluate the condition dynamically
+    } catch (error) {
+      console.error("Error evaluating condition:", error);
+      return false; // Return false if evaluation fails
+    }
+  }
+
+  /**
+   * Sanitizes the condition string to allow only valid syntax.
+   * Valid elements: digits, spaces, "and", "or", "not", and parentheses.
+   * @param {string} conditionString - The user-defined condition.
+   * @returns {string|null} - The sanitized condition or null if invalid.
+   */
+  function sanitizeCondition(conditionString) {
+    const validPattern = /^[\d\s()]+(?:and|or|not|[\d\s()])*$/gi;
+    return validPattern.test(conditionString) ? conditionString.toLowerCase() : null;
+  }
+
+  /**
+   * Replaces alert indices in the sanitized condition with logical checks.
+   * @param {string} sanitizedCondition - The sanitized condition string.
+   * @param {Array} alertsToCheck - The subset of alerts to evaluate.
+   * @param {Array} alertList - The list of currently active alerts.
+   * @returns {string} - The condition string with alert checks.
+   */
+  function replaceAlertIndices(sanitizedCondition, alertsToCheck, alertList) {
+    return sanitizedCondition.replace(/\d+/g, (match) => {
+      const index = parseInt(match, 10) - 1; // Convert 1-based index to 0-based
+      const alert = alertsToCheck[index];
+      return alert ? alertList.includes(alert) : false;
+    });
+  }
+
+  // Run the evaluation
+  return evaluateOperations();
+}
+
 // Run Autohotkey scripts to capture user mouse clicks to select coordinates. 
 ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
   console.log('starting ahk script');
@@ -633,7 +726,8 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
         const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][thisRegion]);
         await fsPromises.copyFile(unmodifiedImagePath,path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${thisRegion}.png`));
         win.webContents.send('ocrText', { ocrText });
-        win.webContents.send('updateConfig', { thisData });
+        const component = 'ocrRegions';
+        win.webContents.send('updateConfig', { component, thisData });
         console.log('Image processed and saved successfully');
     
         // Read and send the images using the new box coordinates and configuration settings
@@ -661,7 +755,8 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
         };
         console.log(`Setting Pixel to: (${x1}, ${y1}), color:${pixelData.color}`);
         state['pixelCoords'][thisRegion] = { ...state['pixelCoords'][thisRegion], ...pixelData };
-        win.webContents.send('updateConfig', { pixelData });
+        const component = 'pixelCoords';
+        win.webContents.send('updateConfig', { component, pixelData });
       }      
 
       // Save new settings to config.ini
@@ -769,14 +864,15 @@ async function updateComponents(variableName) {
     // The conditions automation needs these additional arrays to populate it's dropdown listboxes
     state['automation']['selected'].alertRegions = state['alerts']['selected'].regions;
   }
+  const component = variableName;
   const selectedList = state[variableName]['selected'];
-  win.webContents.send('updateList', { selectedList });
+  win.webContents.send('updateList', { component, selectedList });
 
   // Updates variables in component representing configuration data for selected ocr region/alert/pixel/condition
   const selectedRegion = state[variableName].selected.regionSelected;
   const selectedValues = state[variableName][selectedRegion];
-  win.webContents.send('updateConfig', { selectedValues });
-  //console.log(`Sent Config: `, JSON.stringify(selectedValues, null, 2));
+  win.webContents.send('updateConfig', { component, selectedValues });
+  console.log(`Sent Config: `, JSON.stringify(selectedValues, null, 2));
 }
 
 // IPC listener to show overlay with draggable controls

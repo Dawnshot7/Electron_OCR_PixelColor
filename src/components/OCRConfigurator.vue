@@ -232,7 +232,6 @@ export default {
       // Change OCR region being displayed and have main.js send back the new box's config data
       this.ocrList.regionSelected = newSelection;
       window.electronAPI.updateVariable('ocrRegions', 'selected', { regionSelected: newSelection });
-      window.electronAPI.updateVariable('ocrRegions', 'selected', { regions: this.ocrList.regions });
     },
     addRegion() {
       // Add a new OCR region to the listbox
@@ -265,8 +264,8 @@ export default {
     window.electronAPI.updateVariable('ocrRegions', 'selected', { live: false });
 
     // Listen for variable updates to populate the form fields
-    window.electronAPI.onupdateConfig(({ selectedValues }) => {
-      if (selectedValues) {
+    window.electronAPI.onupdateConfig(({ component, selectedValues }) => {
+      if (selectedValues && component === 'ocrRegions') {
         // Populate fields from selectedValues
         this.ocrConfig = { ...this.ocrConfig, ...selectedValues };
         console.log('received config');
@@ -274,8 +273,8 @@ export default {
     });
 
     // Listen for updates to populate the list box
-    window.electronAPI.onupdateList(({ selectedList }) => {
-      if (selectedList) {
+    window.electronAPI.onupdateList(({ component, selectedList }) => {
+      if (selectedList && component === 'ocrRegions') {
         // Populate fields from selectedList
         this.ocrList = { ...this.ocrList, ...selectedList };
         console.log('received list');
