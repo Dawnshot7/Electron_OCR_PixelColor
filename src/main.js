@@ -308,7 +308,9 @@ function createWindow() {
             previousAlertList = alertList;
           }
           if (state['automation']['selected'].live) {
-            console.log(automate(alertList));
+            const button = await automate(alertList)
+            console.log(button);
+            await runAhkScript('sendInput', button, '');
           }
         }
 
@@ -719,8 +721,17 @@ async function automate(alertList) {
   return evaluateOperations();
 }
 
+// IPC listener for renderer-triggered requests
+ipcMain.on('run-ahk-script', async (event, { scriptName, arg1, arg2 }) => {
+  try {
+    await runAhkScript(scriptName, arg1, arg2);
+  } catch (error) {
+    console.error(error);
+  }
+});
+
 // Run Autohotkey scripts to capture user mouse clicks to select coordinates. 
-ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
+async function runAhkScript(scriptName, arg1, arg2) {
   console.log('starting ahk script');
   // getBoxCoords.ahk collects two mouse clicks, getPixelCoords.ahk collects one click
   const ahkPath = path.join(basePath, '../scripts/AutoHotkeyA32.exe');
@@ -781,7 +792,9 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
         state['pixelCoords'][thisRegion] = { ...state['pixelCoords'][thisRegion], ...pixelData };
         const component = 'pixelCoords';
         win.webContents.send('updateConfig', { component, pixelData });
-      }      
+      } else if (scriptName === 'sendInput'){
+        console.log(`Script returned: `, output);
+      }
 
       // Save new settings to config.ini
       saveConfig(configPath);   
@@ -795,7 +808,7 @@ ipcMain.on('run-ahk-script', async (event, {scriptName, arg1, arg2}) => {
   ahkProcess.on('close', (code) => {
     console.log(`AHK process exited with code ${code}`);
   });
-});
+};
 
 // Update the state variable after changes to corresponding variables in the components
 ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
