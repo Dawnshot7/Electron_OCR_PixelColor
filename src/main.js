@@ -270,7 +270,7 @@ async function deleteProfile() {
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1100, 
+    width: 1100,
     height: 700,
     webPreferences: {
       nodeIntegration: false,
@@ -281,59 +281,83 @@ function createWindow() {
 
   // Load the HTML file for the renderer process
   win.loadFile(indexHTMLPath);
-  win.webContents.openDevTools();
+  //win.webContents.openDevTools();
 
   // Initialize alert list used in evaluateConditions()
   let previousAlertList = [];
 
-  // Define a function to handle repeated checks using setTimeout
-  async function checkConditions() {
-    try {
-      // Evaluate all conditions in state['conditions'] and send list of visible alerts to the overlay when game-mode is active
-      if (state['conditions']['selected'].live) {
-        const alertList = await evaluateConditions();
-        // Only update overlay if alertList has changed
-        if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
-          overlayWindow.webContents.send('updateVisibleAlerts', alertList);
-          console.log(`Alert list: `, alertList);
-          previousAlertList = alertList;
+  // Interval ID for dynamic control
+  let intervalId;
+
+  // Function to update the interval dynamically
+  function startInterval() {
+    if (intervalId) clearInterval(intervalId); // Clear any existing interval
+
+    const live = state.automation.selected.live;
+    const gcd = state.automation[state.automation.selected.regionSelected]?.gcd || 1.5; // Default GCD
+    const interval = live ? gcd * 1000 : 500; // Live: GCD in ms; Not live: 500ms
+
+    intervalId = setInterval(async () => {
+      try {
+        // Evaluate all conditions and update visible alerts
+        if (state['conditions']['selected'].live) {
+          const alertList = await evaluateConditions();
+          if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
+            overlayWindow.webContents.send('updateVisibleAlerts', alertList);
+            console.log(`Alert list: `, alertList);
+            previousAlertList = alertList;
+          }
+          if (state['automation']['selected'].live) {
+            console.log(automate(alertList));
+          }
         }
-        if (state['automation']['selected'].live) {
-          console.log(automate(alertList));
+
+        // Get the live pixel color when Pixel Selector component live mode is active
+        if (state['pixelCoords']['selected'].live) {
+          const selectedRegion = state['pixelCoords']['selected'].regionSelected;
+          const selectedX = state['pixelCoords'][selectedRegion].x;
+          const selectedY = state['pixelCoords'][selectedRegion].y;
+          const liveColor = robot.getPixelColor(selectedX, selectedY);
+          win.webContents.send('pixelColor', { liveColor });
         }
-      }
 
-      // Get the live pixel color from the selected pixel coordinate when Pixel Selector component live mode is active
-      if (state['pixelCoords']['selected'].live) {
-        const selectedRegion = state['pixelCoords']['selected'].regionSelected;
-        const selectedX = state['pixelCoords'][selectedRegion].x;
-        const selectedY = state['pixelCoords'][selectedRegion].y;
-        const liveColor = robot.getPixelColor(selectedX, selectedY);
-        win.webContents.send('pixelColor', { liveColor }); // Sending pixel data
-      }
+        // Perform live OCR when OCR Configurator component live mode is active
+        if (state['ocrRegions']['selected'].live) {
+          const selectedRegion = state['ocrRegions']['selected'].regionSelected;
+          const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][selectedRegion]);
+          win.webContents.send('ocrText', { ocrText });
 
-      // Perform live OCR on the selected region when OCR Configurator component live mode is active
-      if (state['ocrRegions']['selected'].live) {
-        const selectedRegion = state['ocrRegions']['selected'].regionSelected;
-        const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][selectedRegion]);
-        win.webContents.send('ocrText', { ocrText }); // Sending OCR data
-
-        // Send the updated images
-        const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
-        const modifiedImageData = fs.readFileSync(modifiedImagePath);
-        win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
+          // Send the updated images
+          const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
+          const modifiedImageData = fs.readFileSync(modifiedImagePath);
+          win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
+        }
+      } catch (error) {
+        console.error("Error during condition evaluation:", error);
       }
-    } catch (error) {
-      console.error("Error during condition evaluation:", error);
-    } finally {
-      // Schedule the next execution
-      setTimeout(checkConditions, 500); // 500ms delay
-    }
+    }, interval);
   }
 
-  // Start the checking loop
-  checkConditions();
+  // Start the interval and listen for state changes to dynamically adjust it
+  startInterval();
+
+  // Example: Listen for changes in state.automation.selected.live or gcd
+  // Replace this logic with your state management approach (e.g., Redux, IPC event listeners, etc.)
+  win.webContents.on('did-finish-load', () => {
+    // Simulated listener for state changes
+    setInterval(() => {
+      // If live state or regionSelected changes, restart the interval
+      const live = state.automation.selected.live;
+      const gcd = state.automation[state.automation.selected.regionSelected]?.gcd || 1.5;
+      const interval = live ? gcd * 1000 : 500;
+
+      if (interval !== (intervalId ? intervalId._idleTimeout : null)) {
+        startInterval(); // Restart interval if conditions change
+      }
+    }, 100); // Check state changes every 100ms
+  });
 }
+
 
 
 // Create overlay window which will be displayed during gameplay
