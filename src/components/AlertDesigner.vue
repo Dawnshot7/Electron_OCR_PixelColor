@@ -81,6 +81,9 @@
             <!-- Toggle Overlay Button -->
             <b-row class="d-flex justify-content-center">
                 <b-button @click="showDraggableOverlay" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">View and Move Alerts</b-button>
+                <div class="d-flex justify-content-center">
+                  <p :style="{ textAlign: 'center', width: '75%' }">Drag alerts to desired location then click the Hide Overlay button on the top left of the screen</p>
+                </div>
             </b-row>
 
           </b-col>

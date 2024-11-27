@@ -117,9 +117,12 @@
             </b-row>
             
             <!-- Button to start OCR region capture -->
-            <b-row class="d-flex justify-content-center">
-              <b-button @click="startCaptureBox" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Start Coordinate Capture</b-button>
-            </b-row>
+              <b-row class="d-flex justify-content-center">
+                <b-button @click="startCaptureBox" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Start Coordinate Capture</b-button>
+                <div class="d-flex justify-content-center">
+                  <p :style="{ textAlign: 'center', width: '75%' }">Records next two mouse button clicks for top-left and bottom-right of ocr box</p>
+                </div>
+              </b-row>
 
           </b-col>
 

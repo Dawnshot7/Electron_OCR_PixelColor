@@ -51,12 +51,14 @@
       </b-col>
 
       <!-- All other content in component -->
-      <b-col cols="9" md="9">
+      <b-col cols="6" md="6">
         <div class="operations-config">
           <!-- GCD Input -->
           <div class="gcd-input">
-            <label :class="{ 'invalid-label': automationConfig.gcdError }" for="gcd">
-              Global Cooldown (GCD):
+            <label :class="{ 'invalid-label': automationConfig.gcdError }" for="gcd"
+                   :style="{ fontSize: '18px', fontWeight: 'bold' }"
+            >
+              Global Cooldown (seconds):
               <span v-if="automationConfig.gcdError" class="error-text">{{ automationConfig.gcdError }}</span>
             </label>
             <input
@@ -67,6 +69,7 @@
               min="0"
               placeholder="Enter GCD value"
               @input="validateGCD"
+              :style="{ marginBottom: '20px' }"
             />
           </div>
 
@@ -86,8 +89,10 @@
                   v-for="(alert, alertIndex) in operation[0]"
                   :key="alertIndex"
                 >
-                  <label :for="`alert-${operationIndex}-${alertIndex}`">
-                    {{ alertIndex + 1 }}:
+                  <label :for="`alert-${operationIndex}-${alertIndex}`"
+                         :style="{ fontSize: '20px', fontWeight: 'bold' }"
+                  >
+                    {{ alertIndex + 1 }}: 
                   </label>
                   <select
                     :id="`alert-${operationIndex}-${alertIndex}`"
@@ -114,16 +119,16 @@
                   Add Alert
                 </b-button>
 
-                <!-- Delete Alert Button -->
+                <!-- Remove Alert Button -->
                 <b-button
                   type="button"
-                  @click="deleteAlert(operationIndex, alertIndex)"
+                  @click="deleteAlert(operationIndex)"
                   class="delete-alert-btn"
                   size="sm"
                   variant="success"
                   :disabled="operation[0].length === 1"
                 >
-                  Delete Alert
+                  Remove Alert
                 </b-button>
               </div>
 
@@ -133,7 +138,7 @@
                   :for="`condition-${operationIndex}`"
                   :class="{ 'invalid-label': automationConfig.conditionErrors[operationIndex] }"
                 >
-                  Condition:
+                  Logical Expression: 
                   <span v-if="automationConfig.conditionErrors[operationIndex]" class="error-text">
                     {{ automationConfig.conditionErrors[operationIndex] }}
                   </span>
@@ -149,12 +154,13 @@
 
               <!-- Button Choice Input -->
               <div class="button-input">
-                <label :for="`button-${operationIndex}`">Button to Press:</label>
+                <label :for="`button-${operationIndex}`">Button to Press: </label>
                 <input
                   :id="`button-${operationIndex}`"
                   v-model="automationConfig.operationsList[operationIndex][2]"
                   type="text"
                   placeholder="Enter button action"
+                  :style="{ marginBottom: '20px' }"
                 />
               </div>
             </div>
@@ -172,7 +178,7 @@
             <!-- Delete Operation Button -->
             <b-button
               type="button"
-              @click="deleteOperation(operationIndex)"
+              @click="deleteOperation()"
               class="delete-operation-btn"
               variant="success"
               :disabled="automationConfig.operationsList.length === 1"
@@ -188,7 +194,7 @@
                   :for="'default-button'"
                   :class="{ 'invalid-label': automationConfig.defaultButtonError }"
                 >
-                  Default Button:
+                  Default Button: 
                   <span v-if="automationConfig.defaultButtonError" class="error-text">
                     {{ automationConfig.defaultButtonError }}
                   </span>
@@ -203,18 +209,38 @@
               </div>
             </div>
           </div>
-
-          <!-- Start Automation Button -->
-          <b-button
-            type="button"
-            @click="startAutomation"
-            class="start-automation-btn"
-            variant="warning"
-          >
-            Start Automation
-          </b-button>
         </div>
         
+      </b-col>
+      <b-col cols="3" md="3">
+        <h3>Operation example</h3>
+        <span>1: alert3<br></span>
+        <span>2: alert5<br></span>
+        <span>3: alert6<br></span>
+        <span>Logical Expression: (1 or 2) and not 3<br></span>
+        <span>Button to Press: f<br></span>
+
+        <!-- Toggle overlay button -->
+        <b-button 
+          @click="toggleGameModeOverlay" 
+          variant="warning" 
+          :style="{ width: 'auto', marginTop: '50px' }"
+        >
+          Toggle Alerts
+        </b-button>
+        <p>Shortcut: Ctrl-Shift-S</p>
+
+        <!-- Start Automation Button -->
+        <b-button
+          type="button"
+          @click="startAutomation"
+          class="start-automation-btn"
+          variant="warning"
+          :style="{ width: 'auto', marginTop: '20px' }"
+        >
+          Toggle Automation
+        </b-button>
+        <p>Currently selected automation will be used. <br>Shortcut: Ctrl-Shift-A</p>
       </b-col>
     </b-row>
   </div>
@@ -245,6 +271,7 @@ export default {
     regionChange(newSelection) {
       // Submits all fields and sends to main.js to update config.ini
       const serializableConfig = toRaw(this.automationConfig);
+      console.log(`sent config: `, JSON.stringify(serializableConfig));
       window.electronAPI.updateVariable('automation', this.automationList.regionSelected, serializableConfig );
 
       // Change automation being displayed and have main.js send back the new automation's config data
@@ -279,16 +306,16 @@ export default {
     addAlert(operationIndex) {
       this.automationConfig.operationsList[operationIndex][0].push('');
     },
-    deleteAlert(operationIndex, alertIndex) {
+    deleteAlert(operationIndex) {
       const alerts = this.automationConfig.operationsList[operationIndex][0];
       if (alerts.length > 1) {
-        alerts.splice(alertIndex, 1);
+        alerts.splice(alerts.length - 1, 1);
       } 
     },
     addOperation() {
       // Validate current conditions before adding a new operation
       const lastIndex = this.automationConfig.operationsList.length - 1;
-      const hasError = this.automationConfig.conditionErrors.some((error) => error !== null);
+      const hasError = this.automationConfig.conditionErrors.some((error) => error !== '');
 
       if (hasError) {
         alert('Please fix all condition errors before adding a new operation.');
@@ -296,33 +323,42 @@ export default {
       }
 
       this.automationConfig.operationsList.splice(lastIndex, 0, [[''], '', '']);
-      this.automationConfig.conditionErrors.splice(lastIndex, 0, null); // Add placeholder for error tracking
+      this.automationConfig.conditionErrors.splice(lastIndex, 0, ''); // Add placeholder for error tracking
     },
-    deleteOperation(operationIndex) {
+    deleteOperation() {
       const isLastNonDefault = this.automationConfig.operationsList.length === 1;
       if (isLastNonDefault) {
         return;
       }
 
-      this.automationConfig.operationsList.splice(operationIndex, 1);
-      this.automationConfig.conditionErrors.splice(operationIndex, 1); // Remove corresponding error tracking
+      this.automationConfig.operationsList.splice(this.automationConfig.operationsList.length - 2, 1);
+      this.automationConfig.conditionErrors.splice(this.automationConfig.operationsList.length - 2, 1); // Remove corresponding error tracking
     },
     validateCondition(operationIndex) {
       const conditionString = this.automationConfig.operationsList[operationIndex][1];
       const validPattern = /^[\d\s()]+(?:and|or|not|[\d\s()])*$/gi;
 
       this.automationConfig.conditionErrors[operationIndex] = validPattern.test(conditionString)
-        ? null
+        ? ''
         : 'User entry is not proper syntax.';
     },
     validateGCD() {
-      this.automationConfig.gcdError = this.automationConfig.gcd > 0 ? null : 'GCD must be a positive number.';
+      this.automationConfig.gcdError = this.automationConfig.gcd >= 0.5 ? '' : 'GCD must be a positive number greater than or equal to 0.5';
     },
     validateDefaultButton() {
       const defaultButton = this.automationConfig.operationsList[this.automationConfig.operationsList.length - 1][2];
       this.automationConfig.defaultButtonError = defaultButton
-        ? null
+        ? ''
         : 'Default button cannot be empty.';
+    },
+    toggleGameModeOverlay() {
+      // Display overlay.html in game-mode (ignoreMouseEvents=true, running condition evaluator in main.js setinterval)
+      const serializableConfig = toRaw(this.automationConfig);
+      window.electronAPI.updateVariable('automation', this.automationList.regionSelected, serializableConfig );
+      
+      // Requests main.js to show/hide the overlay
+      window.electronAPI.toggleGameModeOverlay();
+      console.log('Toggled game-mode overlay');
     },
     startAutomation() {
       // Validate GCD and default button
@@ -341,9 +377,6 @@ export default {
       // Toggles the use of automation in parallel with toggling the overlay
       this.automationList.live = !this.automationList.live;
       window.electronAPI.updateVariable('automation', 'selected', { live: this.automationList.live });
-
-      // Toggles game-mode overlay
-      window.electronAPI.toggleGameModeOverlay();
     }
   },
   mounted() {
@@ -370,6 +403,7 @@ export default {
   unmounted() {
     // Submits all fields and sends to main.js to update config.ini
     const serializableConfig = toRaw(this.automationConfig);
+    console.log(`sent config: `, JSON.stringify(serializableConfig));
     window.electronAPI.updateVariable('automation', this.automationList.regionSelected, serializableConfig );
   }
 };
@@ -401,7 +435,6 @@ export default {
 }
 
 .default-operation {
-  border-top: 2px solid gray;
   padding-top: 10px;
 }
 

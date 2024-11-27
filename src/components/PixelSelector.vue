@@ -88,7 +88,10 @@
 
             <!-- Button to start OCR region capture -->
             <b-row class="d-flex justify-content-center">
-                <b-button @click="startCapturePixel" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Start Coordinate Capture</b-button>
+              <b-button @click="startCapturePixel" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Start Coordinate Capture</b-button>
+              <div class="d-flex justify-content-center">
+                <p :style="{ textAlign: 'center', width: '75%' }">Records next mouse button click for pixel coordinate</p>
+              </div>
             </b-row>
 
           </b-col>

@@ -18,10 +18,26 @@
     .draggable { 
       cursor: move; /* Style to make alerts draggable. Will be added dynamically when alerts are rendered by onDragAlerts() and removed when hideDraggableOverlay is clicked. */
     }
+
+    /* Define the style for the warning button */
+    .btn-warning-large {
+      background-color: #ffc107; /* Warning yellow */
+      color: #212529;          /* Text color */
+      border: 1px solid #ffc107;
+      padding: 10px 20px;      /* Large padding */
+      font-size: 1.25rem;      /* Larger text */
+      border-radius: 0.25rem;  /* Rounded corners */
+      cursor: pointer;
+      display: inline-block;
+      text-align: center;
+      text-decoration: none;
+      transition: background-color 0.2s, box-shadow 0.2s;
+      display: 'none';
+    }
   </style>
 </head>
 <body>
-  <button id="hideDraggableOverlay">Hide Edit Mode Overlay</button> <!-- Button exit edit-mode and hide the clickable overlay -->
+  <button id="hideDraggableOverlay" class="btn-warning-large">Hide Overlay</button> <!-- Button exit edit-mode and hide the clickable overlay -->
   <div id="alerts-container"></div> <!-- Container where dynamic alerts will be placed. Will be cleared at the start of renderAlerts() -->
 
   <script>
@@ -44,6 +60,10 @@
 
     // Show/hide alerts based on continuous IPC data in game mode. Message will be received every 1000ms.
     window.electronAPI.onUpdateVisibleAlerts((visibleAlertIds) => {
+      // Hide the hide overlay button
+      const hideOverlayButton = document.querySelector('.btn-warning-large');
+      hideOverlayButton.style.display = 'none'; 
+
       const alertDivs = document.querySelectorAll('.alert');
       alertDivs.forEach(alertDiv => {
         if (visibleAlertIds.includes(alertDiv.id)) {
@@ -58,6 +78,12 @@
     function renderAlerts(alertConfig) {
       const alertsContainer = document.getElementById('alerts-container');
       alertsContainer.innerHTML = ''; // Clear existing alerts
+
+      // Show the hide overlay button
+      const hideOverlayButton = document.querySelector('.btn-warning-large');
+      if (isEditMode) {
+        hideOverlayButton.style.display = 'block'; 
+      }
 
       // Each alert will be created with its id set to the alertConfig key. The alert properties are set to alert.x, .y, .type, .content, .color, and .textSize
       for (const [key, alert] of Object.entries(alertConfig)) {
@@ -105,6 +131,10 @@
 
       // Notify main process to hide the draggable alert overlay
       window.electronAPI.hideDraggableOverlay();
+
+      // Hide the hide overlay button
+      const hideOverlayButton = document.querySelector('.btn-warning-large');
+      hideOverlayButton.style.display = 'none'; 
 
       // Remove draggable class from each alert
       alertDivs.forEach(alertDiv => {

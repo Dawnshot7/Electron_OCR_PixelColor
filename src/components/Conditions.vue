@@ -103,7 +103,10 @@
 
             <!-- Toggle overlay button -->
             <b-row class="d-flex justify-content-center">
-              <b-button @click="toggleGameModeOverlay" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Toggle Game-mode Overlay</b-button>
+              <b-button @click="toggleGameModeOverlay" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Toggle Active Alerts</b-button>
+              <div class="d-flex justify-content-center">
+                <p :style="{ textAlign: 'center', width: '75%' }">Start/stop evaluating conditions and displaying active alerts. <br>Shortcut: Ctrl-Shift-S</p>
+              </div>
             </b-row>
 
           </b-col>

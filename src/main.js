@@ -1,5 +1,5 @@
 // Import necessary modules from Electron and RobotJS
-const { app, Menu, BrowserWindow } = require('electron'); // Electron APIs. Robotjs requires Electron v17.4.11
+const { app, Menu, BrowserWindow, globalShortcut } = require('electron'); // Electron APIs. Robotjs requires Electron v17.4.11
 const { ipcMain } = require('electron'); // Transmit data to Vue components and back to main.js
 const robot = require('robotjs'); // RobotJS for taking screenshots and getting pixel color
 const fs = require('fs'); // Read from and write to config.ini and image files 
@@ -284,7 +284,7 @@ function createWindow() {
   //win.webContents.openDevTools();
 
   // Initialize alert list used in evaluateConditions()
-  let previousAlertList = [];
+  let previousAlertList = ['initial'];
 
   // Interval ID for dynamic control
   let intervalId;
@@ -295,18 +295,25 @@ function createWindow() {
 
     const live = state.automation.selected.live;
     const gcd = state.automation[state.automation.selected.regionSelected]?.gcd || 1.5; // Default GCD
-    const interval = live ? gcd * 1000 : 500; // Live: GCD in ms; Not live: 500ms
+    const interval = live ? gcd * 1000 : 500; // If automation is live, interval will be set to GCD in ms; Not live: 500ms
 
     intervalId = setInterval(async () => {
       try {
-        // Evaluate all conditions and update visible alerts
+        // If automation is turned on by shortcut while condition evaluation is not active and overlay is not visible
+        if (state['automation']['selected'].live && !state['conditions']['selected'].live) {
+          toggleGameModeOverlay();
+        }
+
+        // Evaluate all conditions and update visible alerts. If automation is live, press buttons with autohotkey
         if (state['conditions']['selected'].live) {
           const alertList = await evaluateConditions();
-          if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
+          //if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
             overlayWindow.webContents.send('updateVisibleAlerts', alertList);
             console.log(`Alert list: `, alertList);
             previousAlertList = alertList;
-          }
+          //}
+
+          // If automation is live, run automate to determine what button to press, and press it with sendInput.ahk
           if (state['automation']['selected'].live) {
             const button = await automate(alertList)
             console.log(button);
@@ -357,6 +364,19 @@ function createWindow() {
         startInterval(); // Restart interval if conditions change
       }
     }, 100); // Check state changes every 100ms
+
+    // Register a global shortcut (e.g., Ctrl+Shift+A)
+    globalShortcut.register('Ctrl+Shift+A', () => {
+      // Toggle the state
+      state['automation']['selected'].live = !state['automation']['selected'].live;
+      console.log(
+        `Automation live state toggled: ${state['automation']['selected'].live}`
+      );
+    });
+    globalShortcut.register('Ctrl+Shift+S', () => {
+      // Toggle the game-mode alert overlay and condition evaluation
+      toggleGameModeOverlay();
+    });
   });
 }
 
@@ -640,8 +660,8 @@ async function evaluateConditions() {
 
 // Main automate function
 async function automate(alertList) {
-  const automationSettings = state['automation']['automation1'];
-  const gcd = automationSettings.gcd || 1.5;
+  const automationChoice = state.automation.selected.regionSelected
+  const automationSettings = state['automation'][automationChoice];
   const operationsList = automationSettings.operationsList;
   
   // Evaluates the operations to find a matching button
@@ -930,6 +950,10 @@ ipcMain.on('hideDraggableOverlay', (event) => {
 
 // IPC listener to toggle game-mode click-through overlay
 ipcMain.on('toggleGameModeOverlay', (event) => {
+  toggleGameModeOverlay();
+});
+
+function toggleGameModeOverlay() {
   if (!state['conditions']['selected'].live) {
     overlayWindow.webContents.send('initAlerts', state['alerts']);
     state['conditions']['selected'].live = true;
@@ -937,8 +961,9 @@ ipcMain.on('toggleGameModeOverlay', (event) => {
     overlayWindow.show();
   } else {
     state['conditions']['selected'].live = false;
+    state['automation']['selected'].live = false;
     overlayWindow.hide();
   }
-});
+}
 
 
