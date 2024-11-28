@@ -281,7 +281,7 @@ function createWindow() {
 
   // Load the HTML file for the renderer process
   win.loadFile(indexHTMLPath);
-  win.webContents.openDevTools();
+  //win.webContents.openDevTools();
 
   // Initialize alert list used in evaluateConditions()
   let previousAlertList = ['initial'];

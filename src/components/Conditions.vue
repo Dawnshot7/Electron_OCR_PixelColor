@@ -98,7 +98,10 @@
             <!-- Select alert that will be shown when condition is true -->
             <h4 :style="{ marginTop: '20px' }">Suppression Option</h4>
             <b-form-group label="Condition hides alert for this many seconds:">
-              <b-form-input v-model="conditionConfig.timer" placeholder="">0</b-form-input>
+              <span v-if="conditionConfig.timerError" class="error-text">
+                {{ conditionConfig.timerError }}
+              </span>
+              <b-form-input v-model="conditionConfig.timer" placeholder=0 @input="validateTimer()">0</b-form-input>
             </b-form-group>
 
             <!-- Toggle overlay button -->
@@ -116,8 +119,8 @@
 
             <!-- Add and delete ocr condition buttons -->
             <h4>OCR Conditions</h4>
-            <b-button @click="conditionConfig.ocrRegions = conditionList.ocrRegions[0]" variant="success" size="sm" :style="{ marginRight: '10px'}">Add OCR</b-button>
-            <b-button @click="conditionConfig.ocrRegions = ''" variant="success" size="sm">Remove OCR</b-button>
+            <b-button @click="addOcrCondition" variant="success" size="sm" :style="{ marginRight: '10px'}">Add OCR</b-button>
+            <b-button @click="deleteOcrCondition" variant="success" size="sm">Remove OCR</b-button>
             
             <!-- Dynamic ocr selector fields appear below when the Add OCR button above is clicked -->
             <div v-if="conditionConfig.ocrRegions !== ''">
@@ -132,7 +135,14 @@
 
               <!-- Regex Input -->
               <b-form-group label="Regex Pattern">
-                <b-form-input v-model="conditionConfig.regex" placeholder=""></b-form-input>
+                <span v-if="conditionConfig.regexError" class="error-text">
+                  {{ conditionConfig.regexError }}
+                </span>
+                <b-form-input 
+                  v-model="conditionConfig.regex" 
+                  placeholder=""
+                  @input="validateRegex"
+                ></b-form-input>
               </b-form-group>
 
               <!-- User inputs for match comparison type and match text for each match group in regex (Dynamic fields can be added with the add matches button below) -->
@@ -143,16 +153,21 @@
                 :key="`match-${index}`"
                 class="mb-2"
                 >
+                <span v-if="conditionConfig.matchErrors[index]" class="error-text">
+                  {{ conditionConfig.matchErrors[index] }}
+                </span>
                 <b-row>
                   <b-col cols="4">
                   <b-form-select
                     v-model="match[0]"
+                    @input="validateMatch(index)"
                     :options="['equals', 'notEquals', 'lessThan', 'greaterThan', 'between']"
                   ></b-form-select>
                   </b-col>
                   <b-col cols="4">
                   <b-form-input
                     v-model="match[1]"
+                    @input="validateMatch(index)"
                     placeholder="value"
                   ></b-form-input>
                   </b-col>
@@ -163,6 +178,7 @@
                     >
                     <b-form-input
                       v-model="match[2]"
+                      @input="validateMatch(index)"
                       placeholder="value"
                     ></b-form-input>
                   </div>
@@ -207,16 +223,25 @@
         alert: '',
         timer: 0,
         startTime: 0,
-        resetNeeded: false
+        resetNeeded: false,
+        regexError: '',
+        matchErrors: [],
+        timerError: ''
       }
     };
   },
   methods: {
+    saveConfig() {
+      // Submits all conditionConfig data from selected condition to main.js  
+      const serializableConfig = toRaw(this.conditionConfig);
+      window.electronAPI.updateVariable('conditions', this.conditionList.regionSelected, serializableConfig );
+    },
     regionChange(newSelection) {
       // Change condition being displayed and have main.js send back the new box's config data
       this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
-      const serializableConfig = toRaw(this.conditionConfig);
-      window.electronAPI.updateVariable('conditions', this.conditionList.regionSelected, serializableConfig );
+
+      this.saveConfig();
+
       this.conditionList.regionSelected = newSelection;
       window.electronAPI.updateVariable('conditions', 'selected', { regionSelected: this.conditionList.regionSelected });
     },
@@ -241,29 +266,106 @@
         window.electronAPI.updateVariable('conditions', 'selected', serializableRegions);
       }  
     },
+    addOcrCondition() {
+      // Set properties
+      this.conditionConfig.ocrRegions = this.conditionList.ocrRegions[0];
+      this.conditionConfig.regex = '(.*)';
+      this.conditionConfig.matches[0] = ['equals', '', ''];
+
+      // Call validation function
+      this.validateMatch(0);
+    },
+    deleteOcrCondition() {
+      this.conditionConfig.ocrRegions = '';
+      this.conditionConfig.regex = '';
+      this.conditionConfig.regexError = '';
+      this.conditionConfig.matches = [['','','']];
+      this.conditionConfig.matchErrors = [''];
+      this.saveConfig();
+    },
+    validateRegex() {
+      // Condition is validated after every character typed, and errors stored. 
+      const regexString = this.conditionConfig.regex;
+      try {
+        // Attempt to create a RegExp object with the user's input
+        new RegExp(regexString);
+        if (regexString === '') {
+          // Error text is displayed in red above the field 
+          this.conditionConfig.regexError = 'Regex cannot be empty.';
+          this.conditionConfig.regex = '(.*)';
+        } else {
+          this.conditionConfig.regexError = ''; // No error
+        }
+      } catch (e) {
+        this.conditionConfig.regexError = 'Invalid regular expression syntax.';
+        this.conditionConfig.regex = '(.*)';
+      }
+      this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
+      this.saveConfig();
+    },
     addMatch() {
-	  // Add new match field
-      this.conditionConfig.matches.push(['','','']);
+	    // Add new match field with default comparison
+      this.conditionConfig.matches.push(['equals','','']);
+      this.conditionConfig.matchErrors.push(['']);
+      this.validateMatch(this.conditionConfig.matches.length - 1);
     },
     deleteMatch() {
-	  // Delete bottom match field
+      // Delete bottom match field
+      if (this.conditionConfig.matches.length === 1) {
+        return
+      }
       this.conditionConfig.matches.pop();
+      this.conditionConfig.matchErrors.pop();
+      this.saveConfig();
+    }, 
+    validateMatch(matchIndex) {
+      // Condition is validated after every character typed, and errors stored. Index 1 in operationsList[operationIndex] represents the logical expression condition.
+      const matchComparison = this.conditionConfig.matches[matchIndex][0];
+      const matchString1 = this.conditionConfig.matches[matchIndex][1];
+      const matchString2 = this.conditionConfig.matches[matchIndex][2];
+
+      // Error text is displayed in red above the field and stored
+      if (matchComparison === 'between' && (matchString1 === '' || matchString2 === '')) {
+        this.conditionConfig.matchErrors[matchIndex] = 'Match cannot be empty.';
+      } else if (matchComparison === 'equals' && matchString1 === '') {
+        this.conditionConfig.matchErrors[matchIndex] = 'Match cannot be empty. Try: No text found';
+      } else if (matchString1 === '') {
+        this.conditionConfig.matchErrors[matchIndex] = 'Match cannot be empty.';
+      } else {
+        this.conditionConfig.matchErrors[matchIndex] = '';
+      }
+      this.saveConfig();
     },    
 	  addPixelCoord() {
-    // Add new pixel coordinate
-      this.conditionConfig.pixelCoords.push('');
-      this.conditionConfig.pixelComparison.push('');
+    // Add new pixel coordinate with default conditions
+      const defaultPixel = this.conditionList.pixelRegions[0] || ''; 
+      this.conditionConfig.pixelCoords.push(defaultPixel);
+      this.conditionConfig.pixelComparison.push('equals');
+      this.saveConfig();
     },
 	  deletePixelCoord() {
-    // Delete bottom pixel coordinate
+      // Delete bottom pixel coordinate
       this.conditionConfig.pixelCoords.pop();
+      this.conditionConfig.pixelComparison.pop();
+      this.saveConfig();
+    },
+    validateTimer() {
+      let value = parseFloat(this.conditionConfig.timer); // Convert to number
+      if (isNaN(value) || value < 0) {
+        this.conditionConfig.timerError = 'Timer must be 0 or a positive number';
+        this.conditionConfig.timer = 0;
+      } else {
+        this.conditionConfig.timerError = '';
+        this.conditionConfig.timer = value;
+      }
+      this.saveConfig();
     },
 	  toggleGameModeOverlay() {
       // Display overlay.html in game-mode (ignoreMouseEvents=true, running condition evaluator in main.js setinterval)
       this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
-      const serializableConfig = toRaw(this.conditionConfig);
-      // Submits all fields and sends to main.js to update config.ini
-      window.electronAPI.updateVariable('conditions', this.conditionList.regionSelected, serializableConfig );
+
+      this.saveConfig();
+
       // Requests main.js to show/hide the overlay
       window.electronAPI.toggleGameModeOverlay();
       console.log('Toggled game-mode overlay');
@@ -295,8 +397,7 @@
   unmounted() {
     // Submits all fields and sends to main.js to update config.ini
     this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
-    const serializableConfig = toRaw(this.conditionConfig);
-    window.electronAPI.updateVariable('conditions', this.conditionList.regionSelected, serializableConfig );
+    this.saveConfig();
   }
 };
 </script>
@@ -304,5 +405,15 @@
 <style scoped>
 .bold-btn {
   font-weight: bold; /* Force bold text on listbox items */
+}
+
+.invalid-label {
+  color: red;
+}
+
+.error-text {
+  color: red;
+  font-size: 0.9em;
+  margin-left: 5px;
 }
 </style>
