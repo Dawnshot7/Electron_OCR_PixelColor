@@ -97,6 +97,7 @@
                   <select
                     :id="`alert-${operationIndex}-${alertIndex}`"
                     v-model="automationConfig.operationsList[operationIndex][0][alertIndex]"
+                    @change="alertSelected()"
                   >
                     <option
                       v-for="alertOption in automationList.alertRegions"
@@ -154,10 +155,19 @@
 
               <!-- Button Choice Input -->
               <div class="button-input">
-                <label :for="`button-${operationIndex}`">Button to Press: </label>
+                <label 
+                  :for="`button-${operationIndex}`"
+                  :class="{ 'invalid-label': automationConfig.buttonErrors[operationIndex] }"
+                >
+                  Button to Press: 
+                </label>
+                <span v-if="automationConfig.buttonErrors[operationIndex]" class="error-text">
+                  {{ automationConfig.buttonErrors[operationIndex] }}
+                </span>
                 <input
                   :id="`button-${operationIndex}`"
                   v-model="automationConfig.operationsList[operationIndex][2]"
+                  @input="validateButton(operationIndex)"
                   type="text"
                   placeholder="Enter button action"
                   :style="{ marginBottom: '20px' }"
@@ -259,152 +269,192 @@ export default {
         live: false,
       },
       automationConfig: {
-        gcd: '', // Default GCD value
-        operationsList: [[[''], '', 'defaultButton']], // Default operation
+        gcd: '', 
+        operationsList: [[[''], '', 'defaultButton']], // Default operation structure
         conditionErrors: [], // Track condition errors for each operation
+        buttonErrors: [], // Track button errors for each operation
         gcdError: '',
         defaultButtonError: '',
       },
     };
   },
   methods: {
-    regionChange(newSelection) {
-      // Submits all fields and sends to main.js to update config.ini
+    saveConfig() {
+      // Submits all automationConfig data from selected automation to main.js before start of automation 
       const serializableConfig = toRaw(this.automationConfig);
-      console.log(`sent config: `, JSON.stringify(serializableConfig));
       window.electronAPI.updateVariable('automation', this.automationList.regionSelected, serializableConfig );
+    },
+    regionChange(newSelection) {
+      // Submits all automationConfig data from previously selected automation to main.js to update config.ini
+      this.saveConfig();
+      console.log(`Sent automationConfig: `, JSON.stringify(serializableConfig));
 
-      // Change automation being displayed and have main.js send back the new automation's config data
+      // Change automation being displayed and signal main.js to send back the new automation's config data
       this.automationList.regionSelected = newSelection;
       window.electronAPI.updateVariable('automation', 'selected', { regionSelected: newSelection });
     },
     addRegion() {
-      // Add a new automation to the listbox
-      let lastNumber = 0;
+      // Add a new automation to the listbox with a unique name
       const lastItemName = this.automationList.regions[this.automationList.regions.length - 1];
       const match = lastItemName.match(/(\d+)$/);
+      let lastNumber = 0;
       lastNumber = parseInt(match[1], 10);
       const newRegion = `automation${lastNumber + 1}`;
       this.automationList.regions.push(newRegion);
+
       // Switch to new automation. Main.js will add a new automation in config.ini and send back default config settings
       this.regionChange(newRegion);
     },
     deleteRegion() {
-      // Delete current automation from the listbox
+      // Delete currently selected automation from the listbox
       if (this.automationList.regions.length > 1) {
-        const serializableRegions = toRaw(this.automationList);
-        console.log(`Before: `, JSON.stringify(serializableRegions));
         const index = this.automationList.regions.findIndex(region => region === this.automationList.regionSelected);
         this.automationList.regions.splice(index, 1);
-        const serializableRegions2 = toRaw(this.automationList);
-        console.log(`After: `, JSON.stringify(serializableRegions2));
+
+        // Variable must be serialized before sending over IPC
+        const serializableRegions = toRaw(this.automationList);
 
         // Sending automationList with the current automation deleted, which will request main.js to delete the alert data from config.ini
-        window.electronAPI.updateVariable('automation', 'selected', serializableRegions2);
+        window.electronAPI.updateVariable('automation', 'selected', serializableRegions);
+        console.log(`Sent automationList: `, JSON.stringify(serializableRegions));
       }  
     },
     addAlert(operationIndex) {
-      this.automationConfig.operationsList[operationIndex][0].push('');
+      // Add alert to respective operation. Operation's v-for loop will display a new listbox for alert selection.
+      const defaultAlert = this.automationList.alertRegions[0] || ''; 
+      this.automationConfig.operationsList[operationIndex][0].push(defaultAlert);
+      this.saveConfig();
     },
     deleteAlert(operationIndex) {
+      // Delete last alert in list from respective operation. Index 0 in operationsList[operationIndex] represents the list of alerts.
       const alerts = this.automationConfig.operationsList[operationIndex][0];
+      
+      // At least 1 alert per operation required
       if (alerts.length > 1) {
         alerts.splice(alerts.length - 1, 1);
       } 
+      this.saveConfig();
+    },
+    alertSelected() {
+      // Save after every change to automation config
+      this.saveConfig();
     },
     addOperation() {
-      // Validate current conditions before adding a new operation
+      // Add operation to end of list of operations (before default) and error tracking list. A v-for loop will display the new operation's config fields.
       const lastIndex = this.automationConfig.operationsList.length - 1;
-      const hasError = this.automationConfig.conditionErrors.some((error) => error !== '');
-
-      if (hasError) {
-        alert('Please fix all condition errors before adding a new operation.');
-        return;
-      }
-
-      this.automationConfig.operationsList.splice(lastIndex, 0, [[''], '', '']);
-      this.automationConfig.conditionErrors.splice(lastIndex, 0, ''); // Add placeholder for error tracking
+      const defaultAlert = this.automationList.alertRegions[0] || ''; 
+      this.automationConfig.operationsList.splice(lastIndex, 0, [[defaultAlert], '', '']);
+      this.automationConfig.conditionErrors.splice(lastIndex, 0, '');
+      
+      // Set error labels for empty fields
+      this.validateCondition(lastIndex);
+      this.validateButton(lastIndex);
+      this.saveConfig();
     },
     deleteOperation() {
+      // Must be a minimum of one operation besides the default
       const isLastNonDefault = this.automationConfig.operationsList.length === 1;
       if (isLastNonDefault) {
         return;
       }
 
+      // Remove automation from list of automations and error tracking list
       this.automationConfig.operationsList.splice(this.automationConfig.operationsList.length - 2, 1);
-      this.automationConfig.conditionErrors.splice(this.automationConfig.operationsList.length - 2, 1); // Remove corresponding error tracking
+      this.automationConfig.conditionErrors.splice(this.automationConfig.operationsList.length - 2, 1); 
+      this.saveConfig();
     },
     validateCondition(operationIndex) {
+      // Condition is validated after every character typed, and errors stored. Index 1 in operationsList[operationIndex] represents the logical expression condition.
       const conditionString = this.automationConfig.operationsList[operationIndex][1];
+      
+      // Test pattern representing acceptable logical expression terms
       const validPattern = /^[\d\s()]+(?:and|or|not|[\d\s()])*$/gi;
 
+      // Error text is displayed in red above the field and stored
       this.automationConfig.conditionErrors[operationIndex] = validPattern.test(conditionString)
         ? ''
         : 'User entry is not proper syntax.';
+      this.saveConfig();
+    },
+    validateButton(operationIndex) {
+      // Condition is validated after every character typed, and errors stored. Index 1 in operationsList[operationIndex] represents the logical expression condition.
+      const buttonString = this.automationConfig.operationsList[operationIndex][2];
+
+      // Error text is displayed in red above the field and stored
+      this.automationConfig.buttonErrors[operationIndex] = buttonString
+        ? ''
+        : 'Button cannot be empty.';
+      this.saveConfig();
     },
     validateGCD() {
+      // Error text is displayed in red above the field and stored
       this.automationConfig.gcdError = this.automationConfig.gcd >= 0.5 ? '' : 'GCD must be a positive number greater than or equal to 0.5';
+      this.saveConfig();
     },
     validateDefaultButton() {
+      // Default operation must contain a button to be pressed each cycle in case other operations evaluate false. Index 2 in operationsList[operationIndex] represents button to be pressed.
       const defaultButton = this.automationConfig.operationsList[this.automationConfig.operationsList.length - 1][2];
+      
+      // Error text is displayed in red above the field and stored
+      this.automationConfig.buttonErrors[this.automationConfig.operationsList.length - 1] = defaultButton
+        ? ''
+        : 'Default button cannot be empty.';
       this.automationConfig.defaultButtonError = defaultButton
         ? ''
         : 'Default button cannot be empty.';
+      this.saveConfig();
     },
     toggleGameModeOverlay() {
-      // Display overlay.html in game-mode (ignoreMouseEvents=true, running condition evaluator in main.js setinterval)
-      const serializableConfig = toRaw(this.automationConfig);
-      window.electronAPI.updateVariable('automation', this.automationList.regionSelected, serializableConfig );
+      // Submits all automationConfig data from selected automation to main.js  
+      this.saveConfig();
       
-      // Requests main.js to show/hide the overlay
+      // Requests main.js to show/hide the alerts overlay (overlay.html) in game-mode (ignoreMouseEvents=true, running condition evaluator in main.js setinterval)
       window.electronAPI.toggleGameModeOverlay();
       console.log('Toggled game-mode overlay');
     },
     startAutomation() {
-      // Validate GCD and default button
+      // Verifies that there are no errors in automation config before starting automation. Keyboard shortcut defined in main.js also requires no errors in operationsList
       if (!this.automationList.live) {
-        this.validateGCD();
-        this.validateDefaultButton();
-
-        if (this.automationConfig.gcdError || this.automationConfig.defaultButtonError) {
+        // Exit if any of the three error variables contain errors
+        if (this.automationConfig.gcdError || this.automationConfig.buttonErrors.some(err => err.trim() !== '') || this.automationConfig.conditionErrors.some(err => err.trim() !== '')) {
           return;
         }
-        // Submits all fields and sends to main.js to update config.ini
-        const serializableConfig = toRaw(this.automationConfig);
-        window.electronAPI.updateVariable('automation', this.automationList.regionSelected, serializableConfig );
 
+        // Submits all automationConfig data from selected automation to main.js before start of automation 
+        this.saveConfig();
       }
-      // Toggles the use of automation in parallel with toggling the overlay
+      // Toggles the activation of automation in the main.js setInterval. Main.js will display the alert overlay when automation starts if it isn't already visible.
       this.automationList.live = !this.automationList.live;
       window.electronAPI.updateVariable('automation', 'selected', { live: this.automationList.live });
     }
   },
   mounted() {
-    // Trigger main.js to send alertList and alertConfig on component load (whenever 'selected' is sent by updateVariable as second parameter)
+    // Signals main.js to send automationList and automationConfig on component load (whenever 'selected' is sent by updateVariable as second parameter)
     window.electronAPI.updateVariable('automation', 'selected', { live: false });
 
-    // Listen for variable updates to populate the form fields
+    // Listen for variable updates to populate the automationConfig data and the component's form fields
     window.electronAPI.onupdateConfig(({ component, selectedValues }) => {
       if (selectedValues && component === 'automation') {
-        // Populate fields from selectedList
+        // Populate fields from selectedValues
         this.automationConfig = { ...this.automationConfig, ...selectedValues };
         console.log('Received config');
       }
     });
 
-    // Listen for updates to populate the list box 
+    // Listen for updates to populate the automationList data and the component list box 
     window.electronAPI.onupdateList(({ component, selectedList }) => {
       if (selectedList && component === 'automation') {
+        // Populate fields from selectedList
         this.automationList = { ...this.automationList, ...selectedList };
         console.log('Received list');
       }
     });
   },
   unmounted() {
-    // Submits all fields and sends to main.js to update config.ini
+    // Submits all automationConfig data from selected automation to main.js to update config.ini
     const serializableConfig = toRaw(this.automationConfig);
-    console.log(`sent config: `, JSON.stringify(serializableConfig));
     window.electronAPI.updateVariable('automation', this.automationList.regionSelected, serializableConfig );
+    console.log(`sent config: `, JSON.stringify(serializableConfig));
   }
 };
 </script>

@@ -281,7 +281,7 @@ function createWindow() {
 
   // Load the HTML file for the renderer process
   win.loadFile(indexHTMLPath);
-  //win.webContents.openDevTools();
+  win.webContents.openDevTools();
 
   // Initialize alert list used in evaluateConditions()
   let previousAlertList = ['initial'];
@@ -473,14 +473,14 @@ async function processAndSaveModifiedImage(inputPath, outputPath, { brightness, 
         image.greyscale();
         image.brightness((brightness * 2) - 1);
         image.contrast((contrast * 2) - 1);
-        image.resize(originalWidth * 5, originalHeight * 5, Jimp.RESIZE_HERMITE);
+        image.resize(originalWidth * 5, originalHeight * 5, Jimp.RESIZE_BICUBIC);
       });
     } else {
       if (invert) image.invert();
       image.greyscale();
       image.brightness((brightness * 2) - 1);
       image.contrast((contrast * 2) - 1);
-      image.resize(originalWidth * 5, originalHeight * 5, Jimp.RESIZE_HERMITE);
+      image.resize(originalWidth * 5, originalHeight * 5, Jimp.RESIZE_BICUBIC);
     }
 
     // Save the modified image
