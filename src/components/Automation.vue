@@ -250,7 +250,7 @@
         >
           Toggle Automation
         </b-button>
-        <p>Currently selected automation will be used. <br>Shortcut: Ctrl-Shift-A</p>
+        <p>Currently selected automation will be used if no error messages. <br>Shortcut: Ctrl-Shift-A</p>
       </b-col>
     </b-row>
   </div>

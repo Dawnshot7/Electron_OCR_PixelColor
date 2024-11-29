@@ -307,18 +307,21 @@ function createWindow() {
         // Evaluate all conditions and update visible alerts. If automation is live, press buttons with autohotkey
         if (state['conditions']['selected'].live) {
           const alertList = await evaluateConditions();
+
+          // If automation is live, run automate to determine what button to press, and press it with sendInput.ahk
+          if (state['automation']['selected'].live) {            
+            const button = await automate(alertList)
+            console.log(button);
+            await runAhkScript('sendInput', button, '');
+            alertList.push('alertAutomation');
+          }
+
+          alertList.push('alertOverlay');
           //if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
             overlayWindow.webContents.send('updateVisibleAlerts', alertList);
             console.log(`Alert list: `, alertList);
             previousAlertList = alertList;
           //}
-
-          // If automation is live, run automate to determine what button to press, and press it with sendInput.ahk
-          if (state['automation']['selected'].live) {
-            const button = await automate(alertList)
-            console.log(button);
-            await runAhkScript('sendInput', button, '');
-          }
         }
 
         // Get the live pixel color when Pixel Selector component live mode is active
@@ -368,10 +371,15 @@ function createWindow() {
     // Register a global shortcut (e.g., Ctrl+Shift+A)
     globalShortcut.register('Ctrl+Shift+A', () => {
       // Toggle the state
-      state['automation']['selected'].live = !state['automation']['selected'].live;
-      console.log(
-        `Automation live state toggled: ${state['automation']['selected'].live}`
-      );
+      const currentAutomation = state.automation.selected.regionSelected;
+      if (state.automation[currentAutomation].gcdError || state.automation[currentAutomation].buttonErrors.some(err => err.trim() !== '') || state.automation[currentAutomation].conditionErrors.some(err => err.trim() !== '')) {
+        return;
+      } else {
+        state['automation']['selected'].live = !state['automation']['selected'].live;
+        console.log(
+          `Automation live state toggled: ${state['automation']['selected'].live}`
+        );
+      }
     });
     globalShortcut.register('Ctrl+Shift+S', () => {
       // Toggle the game-mode alert overlay and condition evaluation

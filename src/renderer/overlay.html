@@ -93,6 +93,10 @@
           alertDiv.id = key; // Set ID for drag handling
           alertDiv.style.left = `${alert.x}px`; // Set absolute x position
           alertDiv.style.top = `${alert.y}px`; // Set absolute y position
+          if (key === 'alertOverlay' || key === 'alertAutomation') {
+            alertDiv.style.border = '2px solid';
+            alertDiv.style.borderColor = alert.color;
+          }
 
           // Image alerts are a future development idea and are not yet used
           if (alert.type === 'image') {

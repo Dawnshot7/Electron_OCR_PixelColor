@@ -294,7 +294,12 @@
           this.conditionConfig.regexError = 'Regex cannot be empty.';
           this.conditionConfig.regex = '(.*)';
         } else {
-          this.conditionConfig.regexError = ''; // No error
+          if (regexString.includes('~')) {
+            this.conditionConfig.regexError = 'Invalid regular expression syntax. ~ cannot be used.';
+            this.conditionConfig.regex = '(.*)';
+          } else {
+            this.conditionConfig.regexError = ''; // No error
+          }
         }
       } catch (e) {
         this.conditionConfig.regexError = 'Invalid regular expression syntax.';
