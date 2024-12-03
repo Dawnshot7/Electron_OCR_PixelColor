@@ -1,6 +1,28 @@
 <template>
   <div class="container mt-4">
-    <h1 class="mb-3">Pixel Selector</h1>
+    <!-- Component Heading -->
+    <div class="d-flex align-items-center">
+      <h1 class="mb-3">Pixel Selector: </h1>
+
+      <!-- Currently selected item name -->
+      <b-form-input 
+        v-model="renameRegionValue" 
+        class="ml-2" 
+        style="max-width: 150px; max-height: 40px; margin-bottom: 10px; margin-left: 10px" 
+        :placeholder="pixelList.regionSelected"
+        maxlength="20">
+      </b-form-input>
+
+      <!-- Rename Button -->
+      <b-button 
+        class="ml-2" 
+        @click="renameRegion(renameRegionValue)"
+        style="max-height: 40px; margin-bottom: 10px;" 
+        size="sm"
+        variant="light">
+        Rename
+      </b-button>
+    </div>
     <b-row>
 
       <!-- Left column with listbox of pixel coordinates -->
@@ -142,6 +164,7 @@ export default {
         color: '000000',
         liveColor: '000000'
       },
+      renameRegionValue: ''
     };
   },
   methods: {
@@ -152,18 +175,25 @@ export default {
     regionChange(newSelection) {
       // Change pixel coordinate being displayed and have main.js send back the new pixel's config data
       this.pixelList.regionSelected = newSelection;
-      window.electronAPI.updateVariable('pixelCoords', 'selected', { regionSelected: newSelection });
+      window.electronAPI.updateVariable('update', 'pixelCoords', 'selected', { regionSelected: newSelection });
     },
     addRegion() {
-      // Add a new pixel coordinate to the listbox
-      let lastNumber = 0;
-      const lastItemName = this.pixelList.regions[this.pixelList.regions.length - 1];
-      const match = lastItemName.match(/(\d+)$/);
-      lastNumber = parseInt(match[1], 10);
-      const newRegion = `pixel${lastNumber + 1}`;
+      // Find the highest number at the end of existing alert names, create new unique alert name, add to regions list
+      let highestNumber = 0;
+      this.pixelList.regions.forEach(region => {
+        const match = region.match(/pixel(\d+)$/); // Match names ending in 'alert<number>'
+        if (match) {
+          const number = parseInt(match[1], 10);
+          if (number > highestNumber) {
+            highestNumber = number;
+          }
+        }
+      });
+      const newRegion = `pixel${highestNumber + 1}`;
       this.pixelList.regions.push(newRegion);
       // Switch to new pixel. Main.js will add a new pixel in config.ini and send back default config settings
-      this.regionChange(newRegion);
+      this.pixelList.regionSelected = newRegion;
+      window.electronAPI.updateVariable('add', 'pixelCoords', 'selected', { regionSelected: newRegion });
     },
     deleteRegion() {
       // Delete current pixel coordinate from the listbox
@@ -173,17 +203,22 @@ export default {
         console.log(`pixel regions: ${this.pixelList.regions}, selection: ${this.pixelList.regionSelected}`)
         const serializableRegions = toRaw(this.pixelList);
         // Sending pixelList with the current pixel deleted, which will request main.js to delete the pixel data from config.ini
-        window.electronAPI.updateVariable('pixelCoords', 'selected', serializableRegions);
+        window.electronAPI.updateVariable('delete', 'pixelCoords', 'selected', serializableRegions);
       }  
+    },
+    renameRegion(newName) {
+      const serializableConfig = toRaw(this.pixelConfig);
+      window.electronAPI.updateVariable('rename', 'pixelCoords', newName, serializableConfig );
+      this.renameRegionValue = '';
     },
     toggleLive() {
       // Turns on/off pixel color capture being performed in setinterval in main.js which sends back the result every second for display
-      window.electronAPI.updateVariable('pixelCoords', 'selected', { live: this.pixelList.live });
+      window.electronAPI.updateVariable('update', 'pixelCoords', 'selected', { live: this.pixelList.live });
     }
   },
   mounted() {
     // Trigger main.js to send pixelList, pixelConfig and screenshot image on component load (whenever 'selected' is sent by updateVariable as second parameter)
-    window.electronAPI.updateVariable('pixelCoords', 'selected', { live: false });
+    window.electronAPI.updateVariable('update', 'pixelCoords', 'selected', { live: false });
     
     // Listen for variable updates to populate the form fields
     window.electronAPI.onupdateConfig(({ component, selectedValues }) => {

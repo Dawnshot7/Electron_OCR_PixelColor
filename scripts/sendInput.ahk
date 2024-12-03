@@ -21,7 +21,9 @@ StringReplace, arg1, arg1, f2, {F2}, All
 ; Add more key replacements as needed
 
 ; Send the processed input
-SendInput, %arg1%
+if (!GetKeyState("Shift", "P") && !GetKeyState("Ctrl", "P")) {
+    SendInput, %arg1%
+}
 
 ; Return success code via stdout
 FileAppend, 1, *

@@ -1,6 +1,28 @@
 <template>
   <div class="container mt-4">
-    <h1 class="mb-3">Conditions Builder</h1>
+    <!-- Component Heading -->
+    <div class="d-flex align-items-center">
+      <h1 class="mb-3">Conditions: </h1>
+
+      <!-- Currently selected item name -->
+      <b-form-input 
+        v-model="renameRegionValue" 
+        class="ml-2" 
+        style="max-width: 150px; max-height: 40px; margin-bottom: 10px; margin-left: 10px" 
+        :placeholder="conditionList.regionSelected"
+        maxlength="20">
+      </b-form-input>
+
+      <!-- Rename Button -->
+      <b-button 
+        class="ml-2" 
+        @click="renameRegion(renameRegionValue)"
+        style="max-height: 40px; margin-bottom: 10px;"  
+        size="sm"
+        variant="light">
+        Rename
+      </b-button>
+    </div>
     <b-row>
 
       <!-- Left column with listbox of conditions -->
@@ -88,7 +110,7 @@
 
             <!-- Select alert that will be shown when condition is true -->
             <h4 :style="{ marginTop: '20px' }">Alert Choice</h4>
-            <b-form-group label="Alert">
+            <b-form-group label="Alert:">
               <b-form-select
               v-model="conditionConfig.alert"
               :options="conditionList.alertRegions"
@@ -97,7 +119,7 @@
 
             <!-- Select alert that will be shown when condition is true -->
             <h4 :style="{ marginTop: '20px' }">Suppression Option</h4>
-            <b-form-group label="Condition hides alert for this many seconds:">
+            <b-form-group label="If non-zero, condition instead hides alert for this many seconds:">
               <span v-if="conditionConfig.timerError" class="error-text">
                 {{ conditionConfig.timerError }}
               </span>
@@ -126,7 +148,7 @@
             <div v-if="conditionConfig.ocrRegions !== ''">
 
               <!-- Select OCR Region from dropdown -->
-              <b-form-group label="OCR Region">
+              <b-form-group label="OCR Region:">
                 <b-form-select
                 v-model="conditionConfig.ocrRegions"
                 :options="conditionList.ocrRegions"
@@ -134,7 +156,7 @@
               </b-form-group>
 
               <!-- Regex Input -->
-              <b-form-group label="Regex Pattern">
+              <b-form-group label="Regex Pattern: Use (.*) if unsure">
                 <span v-if="conditionConfig.regexError" class="error-text">
                   {{ conditionConfig.regexError }}
                 </span>
@@ -156,7 +178,7 @@
                 <span v-if="conditionConfig.matchErrors[index]" class="error-text">
                   {{ conditionConfig.matchErrors[index] }}
                 </span>
-                <b-row>
+                <b-row no-gutters>
                   <b-col cols="4">
                   <b-form-select
                     v-model="match[0]"
@@ -172,10 +194,7 @@
                   ></b-form-input>
                   </b-col>
                   <b-col cols="4">
-                    <div
-                    v-if="match[0] === 'between'"
-                    class="mb-2"
-                    >
+                    <div v-if="match[0] === 'between'" class="mb-2">
                     <b-form-input
                       v-model="match[2]"
                       @input="validateMatch(index)"
@@ -227,34 +246,40 @@
         regexError: '',
         matchErrors: [],
         timerError: ''
-      }
+      },
+      renameRegionValue: ''
     };
   },
   methods: {
     saveConfig() {
       // Submits all conditionConfig data from selected condition to main.js  
+      this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
       const serializableConfig = toRaw(this.conditionConfig);
-      window.electronAPI.updateVariable('conditions', this.conditionList.regionSelected, serializableConfig );
+      window.electronAPI.updateVariable('update', 'conditions', this.conditionList.regionSelected, serializableConfig );
     },
     regionChange(newSelection) {
       // Change condition being displayed and have main.js send back the new box's config data
-      this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
-
       this.saveConfig();
-
       this.conditionList.regionSelected = newSelection;
-      window.electronAPI.updateVariable('conditions', 'selected', { regionSelected: this.conditionList.regionSelected });
+      window.electronAPI.updateVariable('update', 'conditions', 'selected', { regionSelected: newSelection });
     },
     addRegion() {
-      // Add a new condition to the listbox
-      let lastNumber = 0;
-      const lastItemName = this.conditionList.regions[this.conditionList.regions.length - 1];
-      const match = lastItemName.match(/(\d+)$/);
-      lastNumber = parseInt(match[1], 10);
-      const newRegion = `condition${lastNumber + 1}`;
+      // Find the highest number at the end of existing alert names, create new unique alert name, add to regions list
+      let highestNumber = 0;
+      this.conditionList.regions.forEach(region => {
+        const match = region.match(/condition(\d+)$/); // Match names ending in 'alert<number>'
+        if (match) {
+          const number = parseInt(match[1], 10);
+          if (number > highestNumber) {
+            highestNumber = number;
+          }
+        }
+      });
+      const newRegion = `condition${highestNumber + 1}`;
       this.conditionList.regions.push(newRegion);
       // Switch to new condition. Main.js will add a new condition in config.ini and send back default config settings
-      this.regionChange(newRegion);
+      this.conditionList.regionSelected = newRegion;
+      window.electronAPI.updateVariable('add', 'conditions', 'selected', { regionSelected: newRegion });
     },
     deleteRegion() {
       // Delete current condition from the listbox
@@ -263,8 +288,13 @@
         this.conditionList.regions.splice(index, 1);
         const serializableRegions = toRaw(this.conditionList);
         // Sending conditionList with the current condition deleted, which will request main.js to delete the condition data from config.ini
-        window.electronAPI.updateVariable('conditions', 'selected', serializableRegions);
+        window.electronAPI.updateVariable('delete', 'conditions', 'selected', serializableRegions);
       }  
+    },
+    renameRegion(newName) {
+      this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
+      const serializableConfig = toRaw(this.conditionConfig);
+      window.electronAPI.updateVariable('rename', 'conditions', newName, serializableConfig );
     },
     addOcrCondition() {
       // Set properties
@@ -305,7 +335,6 @@
         this.conditionConfig.regexError = 'Invalid regular expression syntax.';
         this.conditionConfig.regex = '(.*)';
       }
-      this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
       this.saveConfig();
     },
     addMatch() {
@@ -367,8 +396,6 @@
     },
 	  toggleGameModeOverlay() {
       // Display overlay.html in game-mode (ignoreMouseEvents=true, running condition evaluator in main.js setinterval)
-      this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
-
       this.saveConfig();
 
       // Requests main.js to show/hide the overlay
@@ -378,7 +405,7 @@
   },
   mounted() {
     // Trigger main.js to send conditionList and conditionConfig on component load (whenever 'selected' is sent by updateVariable as second parameter)
-    window.electronAPI.updateVariable('conditions', 'selected', {});
+    window.electronAPI.updateVariable('update', 'conditions', 'selected', {});
     
     // Listen for variable updates to populate the form fields
     window.electronAPI.onupdateConfig(({ component, selectedValues }) => {
@@ -401,7 +428,6 @@
   },
   unmounted() {
     // Submits all fields and sends to main.js to update config.ini
-    this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
     this.saveConfig();
   }
 };

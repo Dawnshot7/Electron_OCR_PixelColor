@@ -176,7 +176,7 @@
       const id = event.target.id;
 
       // Send the new position back to main.js
-      window.electronAPI.updateVariable('alerts',id, { x: newX, y: newY });
+      window.electronAPI.updateVariable('update', 'alerts',id, { x: newX, y: newY });
     }
   </script>
 </body>

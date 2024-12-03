@@ -4,7 +4,8 @@
     <!-- Sidebar for switching between tabs. Uses Bootstrap Vue's vertical navigation for layout -->
     <b-nav vertical class="sidebar">
 
-      <!-- Profile name -->
+      <!-- Profile name / rename sits above main sidebar items -->
+      <p class="profile-label" :style="{ textAlign: 'center', width: '100%', marginTop: '10px', marginBottom: '3px' }">Profile:</p>
       <div class="profile-section d-flex justify-content-center" style="margin-bottom: 40px; width: 100%;">
         <!-- Show Profile Name -->
         <div v-if="!isRenaming">
@@ -12,7 +13,7 @@
             @click="toggleRename" 
             size="sm" 
             variant="light"
-            style="margin-top: 20px; font-size: 16px"
+            style="font-size: 16px"
           >
           {{ currentProfile }}
           </b-button>

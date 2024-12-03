@@ -2,7 +2,7 @@
 const { app, Menu, BrowserWindow, globalShortcut } = require('electron'); // Electron APIs. Robotjs requires Electron v17.4.11
 const { ipcMain } = require('electron'); // Transmit data to Vue components and back to main.js
 const robot = require('robotjs'); // RobotJS for taking screenshots and getting pixel color
-const fs = require('fs'); // Read from and write to config.ini and image files 
+const fs = require('fs'); // Read from and write to {currentProfile}.ini and image files 
 const path = require('path'); // Module for handling and transforming file paths
 const OCRAD = require('ocrad.js');  // OCRAD to perform OCR on screenshots
 const { createCanvas, Image } = require('canvas');  // Used to modify screenshot images before OCR 
@@ -13,7 +13,7 @@ const ini = require('ini'); // Configuration data is stored in a .ini format bet
 
 let win; // Variable to hold the reference to the main application window
 let overlayWindow; // Variable to hold the reference to the transparent alert window
-let state = {}; // Variable to hold all configuration data from config.ini after JSON.parse is performed in loadConfig()
+let state = {}; // Variable to hold all configuration data from {currentProfile}.ini after JSON.parse is performed in loadConfig()
 
 // Modify basePath to work as the correct path to main.js in both development and production
 const isDev = process.env.NODE_ENV === 'development'; 
@@ -65,7 +65,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Read the contents of config.ini into the state map variable
+// Read the contents of {currentProfile}.ini into the state map variable
 function loadConfig(filePath) {
   if (!fs.existsSync(filePath)) {
     fs.copyFileSync(defaultProfilePath, filePath)
@@ -85,7 +85,7 @@ function loadConfig(filePath) {
   }
 }
 
-// Save the contents of the state variable into config.ini
+// Save the contents of the state variable into {currentProfile}.ini
 function saveConfig(filePath) {
   // Initialize an empty config object for writing
   let configForIni = {};
@@ -824,7 +824,7 @@ async function runAhkScript(scriptName, arg1, arg2) {
         console.log(`Script returned: `, output);
       }
 
-      // Save new settings to config.ini
+      // Save new settings to {currentProfile}.ini
       saveConfig(configPath);   
     } else {
       console.log('No coordinates received from AHK script');
@@ -839,68 +839,119 @@ async function runAhkScript(scriptName, arg1, arg2) {
 };
 
 // Update the state variable after changes to corresponding variables in the components
-ipcMain.on('update-variable', async (event, { variableName, key, value }) => {
+ipcMain.on('update-variable', async (event, { action, currentComponent, key, value }) => {
   try {
-    if (!state[variableName]) {
-      console.error(`Key ${variableName} not found in state`);
-    } else if (!state[variableName][key]) {
-      console.error(`Key ${key} not found in state[${variableName}]`);
+    if (!state[currentComponent]) {
+      console.error(`Key ${currentComponent} not found in state`);
+    } else if (!state[currentComponent][key] && !action === 'rename') {
+      console.error(`Key ${key} not found in state[${currentComponent}]`);
     } else {
-      currentComponent = variableName;
       // Update the variable data key by key
-      state[variableName][key] = { ...state[variableName][key], ...value };
-      console.log(`Updated state[${variableName}][${key}]:`, value);
+      state[currentComponent][key] = { ...state[currentComponent][key], ...value };
+      console.log(`Updated state[${currentComponent}][${key}]:`, value);
       
-      // Currently selected ocr region/alert/pixel/condition
-      region = state[variableName]['selected'].regionSelected
+      // Currently selected ocr/alert/pixel/condition/automation
+      region = state[currentComponent]['selected'].regionSelected
       const regionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${region}.png`);
 
-      // Process add new region request when state[variableName] doesn't have config data for region, and region is not yet in the state[variableName]['selected'].regions array
-      if (!state[variableName]['selected'].regions.includes(region) && !state[variableName][region]) {
-        console.log(`Added new region: ${region} with default config`, state[variableName]['selected'].regions);
+      // Process add new region request 
+      if (action === 'add') {
+        console.log(`Added new region: ${region} with default config`, state[currentComponent]['selected'].regions);
         // Set the config for the new region to the saved default configurations
-        state[variableName][region] = { ...state[variableName][`${variableName}Default`] };
+        state[currentComponent][region] = { ...state[currentComponent][`${currentComponent}Default`] };
         // Add the region to the regions list
-        state[variableName]['selected'].regions.push(region);
+        state[currentComponent]['selected'].regions.push(region);
         // After new region addition, copy the default image saying "No pixel selected" to the region's image filename 
-        if (variableName === 'pixelCoords' || variableName === 'ocrRegions') {
+        if (currentComponent === 'pixelCoords' || currentComponent === 'ocrRegions') {
           if (!fs.existsSync(regionImagePath)) {
             fs.copyFileSync(pixelsDefaultImagePath, regionImagePath);
           }
         }
       } 
-      // Process delete region request when state[variableName] has config data for region, but region is no longer in the state[variableName]['selected'].regions array
-      if (!state[variableName]['selected'].regions.includes(region) && state[variableName][region]) {
-        console.log(`Deleted new region: ${region} with default config`, state[variableName]['selected'].regions);
-        delete state[variableName][region];
-        state[variableName]['selected'].regionSelected = state[variableName]['selected'].regions[0];
-        region = state[variableName]['selected'].regionSelected;
-        // After region deletion, delete the saved image for that region
-        if (variableName === 'pixelCoords' || variableName === 'ocrRegions') {
+      // Process delete region request 
+      if (action === 'delete') {
+        console.log(`Deleted region: ${region}`);
+        // Delete contents of the variable  
+        delete state[currentComponent][region];
+        // Set the regionSelected to the first region in the list
+        state[currentComponent]['selected'].regionSelected = state[currentComponent]['selected'].regions[0];
+        // After region deletion, delete the saved images for that region
+        if (currentComponent === 'pixelCoords' || currentComponent === 'ocrRegions') {
           if (fs.existsSync(regionImagePath)) {
             fs.unlinkSync(regionImagePath);
           }
         }
       }
 
-      // Function to use new config to reperform ocr and update component variables and images 
-      updateComponents(variableName);
+      if (action === 'rename') {
+        console.log(`Renamed region ${region} to ${key}`);
+        // Delete contents of variable with previous name 
+        delete state[currentComponent][region];
+        // Set new regionSelected
+        state[currentComponent]['selected'].regionSelected = key;
+        // Replace region name in regions
+        const index = state[currentComponent]['selected'].regions.findIndex(oldName => oldName === region);
+        state[currentComponent]['selected'].regions.splice(index, 1,key);
+        // Copy the image folders to the new folder name and delete the old folder
+        const newRegionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${key}.png`);
+        if (currentComponent === 'pixelCoords' || currentComponent === 'ocrRegions') {
+          fs.copyFileSync(regionImagePath, newRegionImagePath);
+          fs.unlinkSync(regionImagePath);
+        }
+        // Check all components for references to the renamed region and update them
+        const componentsToCheck = ['conditions', 'automation'];
+        componentsToCheck.forEach(component => {
+          if (state[component]) {
+            // Update lists in the `selected` field
+            ['ocrRegions', 'pixelRegions', 'alertRegions'].forEach(listName => {
+              if (state[component]['selected'] && state[component]['selected'][listName]) {
+                const listIndex = state[component]['selected'][listName].findIndex(item => item === region);
+                if (listIndex !== -1) state[component]['selected'][listName].splice(listIndex, 1, key);
+              }
+            });
+            // Update fields in individual entries
+            Object.keys(state[component]).forEach(entryKey => {
+              if (entryKey !== 'selected' && entryKey !== `${component}Default`) {
+                const entry = state[component][entryKey];
+                // Check if this entry references the renamed region
+                if (entry.ocrRegions === region) entry.ocrRegions = key;
+                if (entry.pixelCoords && entry.pixelCoords.includes(region)) {
+                  entry.pixelCoords = entry.pixelCoords.map(coord => (coord === region ? key : coord));
+                }
+                if (entry.alert === region) entry.alert = key;
+                // Update alert references in automation operationsList
+                if (entry.operationsList) {
+                  entry.operationsList.forEach(operation => {
+                    if (Array.isArray(operation[0])) {
+                      operation[0] = operation[0].map(alert => (alert === region ? key : alert));
+                    }
+                  });
+                }
+              }
+            });
+          }
+        });
+        console.log(`Region ${region} successfully renamed to ${key} across all components.`);
+      }
+
+      // Function to use new config to reperform ocr and update component variables and images over ipc
+      updateComponents(currentComponent);
     }  
-    // Save configuration data config.ini after each change in configuration settings variables
+    // Save configuration data to {currentProfile}.ini after each change in configuration settings variables
     saveConfig(configPath);
   } catch (error) {
     console.error('Error updating variable:', error);
   }
 });
 
-// Function to use new config to reperform ocr and update component variables and images 
-async function updateComponents(variableName) {
-  region = state[variableName]['selected'].regionSelected
+// Function to use new config to reperform ocr and update component lists, configuration variables and images 
+async function updateComponents(currentComponent) {
+  region = state[currentComponent]['selected'].regionSelected
   const regionImagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${region}.png`);
 
-  if (variableName === 'ocrRegions' && !state.ocrRegions.selected.live) {
+  if (currentComponent === 'ocrRegions' && !state.ocrRegions.selected.live) {
     // Perform OCR and send the recognized text after each config change
-    await processAndSaveModifiedImage(regionImagePath, modifiedImagePath, state[variableName][region]);
+    await processAndSaveModifiedImage(regionImagePath, modifiedImagePath, state[currentComponent][region]);
     const ocrText = await recognizeTextFromImage(modifiedImagePath);
     win.webContents.send('ocrText', { ocrText });
     console.log('Image processed and saved successfully');
@@ -911,31 +962,31 @@ async function updateComponents(variableName) {
     win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
     console.log('Sent both images');
   }
-  if (variableName === 'pixelCoords') {
+  if (currentComponent === 'pixelCoords') {
     // After new pixel region addition, copy the default image saying "No pixel selected" to the region's image filename and send to renderer
     const imageData = fs.readFileSync(regionImagePath);
     win.webContents.send('updatePixelImages', { imageData });
     console.log(`sent image for: ${region}`);
    }
   // Updates variables in component used to populate listboxes
-  if (variableName === 'conditions') {
+  if (currentComponent === 'conditions') {
     // The conditions component needs these additional arrays to populate it's dropdown listboxes
     state['conditions']['selected'].ocrRegions = state['ocrRegions']['selected'].regions;
     state['conditions']['selected'].pixelRegions = state['pixelCoords']['selected'].regions;
     state['conditions']['selected'].alertRegions = state['alerts']['selected'].regions;
   }
   // Updates variables in component used to populate listboxes
-  if (variableName === 'automation') {
+  if (currentComponent === 'automation') {
     // The conditions automation needs these additional arrays to populate it's dropdown listboxes
     state['automation']['selected'].alertRegions = state['alerts']['selected'].regions;
   }
-  const component = variableName;
-  const selectedList = state[variableName]['selected'];
+  const component = currentComponent;
+  const selectedList = state[currentComponent]['selected'];
   win.webContents.send('updateList', { component, selectedList });
 
   // Updates variables in component representing configuration data for selected ocr region/alert/pixel/condition
-  const selectedRegion = state[variableName].selected.regionSelected;
-  const selectedValues = state[variableName][selectedRegion];
+  const selectedRegion = state[currentComponent].selected.regionSelected;
+  const selectedValues = state[currentComponent][selectedRegion];
   win.webContents.send('updateConfig', { component, selectedValues });
   console.log(`Sent Config: `, JSON.stringify(selectedValues, null, 2));
 }

@@ -1,6 +1,28 @@
 <template>
   <div class="container mt-4">
-    <h1 class="mb-3">OCR Configurator</h1>
+    <!-- Component Heading -->
+    <div class="d-flex align-items-center">
+      <h1 class="mb-3">OCR Configurator: </h1>
+
+      <!-- Currently selected item name -->
+      <b-form-input 
+        v-model="renameRegionValue" 
+        class="ml-2" 
+        style="max-width: 150px; max-height: 40px; margin-bottom: 10px; margin-left: 10px" 
+        :placeholder="ocrList.regionSelected"
+        maxlength="20">
+      </b-form-input>
+
+      <!-- Rename Button -->
+      <b-button 
+        class="ml-2" 
+        @click="renameRegion(renameRegionValue)"
+        style="max-height: 40px; margin-bottom: 10px;" 
+        size="sm"
+        variant="light">
+        Rename
+      </b-button>
+    </div>
     <b-row>
 
       <!-- Left column with listbox of OCR regions -->
@@ -210,6 +232,7 @@ export default {
         contrast: 0.5,
         brightness: 0.5
       },
+      renameRegionValue: ''
     };
   },
   methods: {
@@ -219,33 +242,40 @@ export default {
     },
     toggleInvert() {
       // Update config.ini with new invert image variable state 
-      window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { invert: this.ocrConfig.invert });
+      window.electronAPI.updateVariable('update', 'ocrRegions', this.ocrList.regionSelected, { invert: this.ocrConfig.invert });
     },
     adjustBrightness(delta) {
       // Increment or decrement brightness and update config.ini
       this.ocrConfig.brightness = Math.min(1, Math.max(0, parseFloat((this.ocrConfig.brightness + delta).toFixed(1))));
-      window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { brightness: this.ocrConfig.brightness });
+      window.electronAPI.updateVariable('update', 'ocrRegions', this.ocrList.regionSelected, { brightness: this.ocrConfig.brightness });
     },
     adjustContrast(delta) {
       // Increment or decrement contrast and update config.ini
       this.ocrConfig.contrast = Math.min(1, Math.max(0, parseFloat((this.ocrConfig.contrast + delta).toFixed(1))));
-      window.electronAPI.updateVariable('ocrRegions', this.ocrList.regionSelected, { contrast: this.ocrConfig.contrast });
+      window.electronAPI.updateVariable('update', 'ocrRegions', this.ocrList.regionSelected, { contrast: this.ocrConfig.contrast });
     },
     regionChange(newSelection) {
       // Change OCR region being displayed and have main.js send back the new box's config data
       this.ocrList.regionSelected = newSelection;
-      window.electronAPI.updateVariable('ocrRegions', 'selected', { regionSelected: newSelection });
+      window.electronAPI.updateVariable('update', 'ocrRegions', 'selected', { regionSelected: newSelection });
     },
     addRegion() {
-      // Add a new OCR region to the listbox
-      let lastNumber = 0;
-      const lastItemName = this.ocrList.regions[this.ocrList.regions.length - 1];
-      const match = lastItemName.match(/(\d+)$/);
-      lastNumber = parseInt(match[1], 10);
-      const newRegion = `ocr${lastNumber + 1}`;
+      // Find the highest number at the end of existing alert names, create new unique alert name, add to regions list
+      let highestNumber = 0;
+      this.ocrList.regions.forEach(region => {
+        const match = region.match(/ocr(\d+)$/); // Match names ending in 'alert<number>'
+        if (match) {
+          const number = parseInt(match[1], 10);
+          if (number > highestNumber) {
+            highestNumber = number;
+          }
+        }
+      });
+      const newRegion = `ocr${highestNumber + 1}`;
       this.ocrList.regions.push(newRegion);
       // Switch to new region. Main.js will add a new region in config.ini and send back default config settings
-      this.regionChange(newRegion);
+      this.ocrList.regionSelected = newRegion;
+      window.electronAPI.updateVariable('add', 'ocrRegions', 'selected', { regionSelected: newRegion });
     },
     deleteRegion() {
       // Delete current OCR region from the listbox
@@ -254,17 +284,22 @@ export default {
         this.ocrList.regions.splice(index, 1);
         const serializableRegions = toRaw(this.ocrList);
         // Sending ocrList with the current region deleted, which will request main.js to delete the region data from config.ini
-        window.electronAPI.updateVariable('ocrRegions', 'selected', serializableRegions);
+        window.electronAPI.updateVariable('delete', 'ocrRegions', 'selected', serializableRegions);
       }   
+    },
+    renameRegion(newName) {
+      const serializableConfig = toRaw(this.ocrConfig);
+      window.electronAPI.updateVariable('rename', 'ocrRegions', newName, serializableConfig );
+      this.renameRegionValue = '';
     },
     toggleLive() {
       // Turns on/off OCR being performed in setinterval in main.js which sends back the result every second for display
-      window.electronAPI.updateVariable('ocrRegions', 'selected', { live: this.ocrList.live });
+      window.electronAPI.updateVariable('update', 'ocrRegions', 'selected', { live: this.ocrList.live });
     }
   },
   mounted() {
     // Trigger main.js to send ocrList, ocrConfig and images on component load (whenever 'selected' is sent by updateVariable as second parameter)
-    window.electronAPI.updateVariable('ocrRegions', 'selected', { live: false });
+    window.electronAPI.updateVariable('update', 'ocrRegions', 'selected', { live: false });
 
     // Listen for variable updates to populate the form fields
     window.electronAPI.onupdateConfig(({ component, selectedValues }) => {

@@ -5,7 +5,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   
   // Used by all componenets to update variables in main.js and config.ini upon changes in the component
-  updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value }),
+  updateVariable: (action, currentComponent, key, value) => ipcRenderer.send('update-variable', { action, currentComponent, key, value }),
   // Used by OCRConfigurator and PixelSelector components to select coordinates for OCR boxes and pixels using AHK scripts
   runAhkScript: (scriptName, arg1, arg2) => ipcRenderer.send('run-ahk-script', { scriptName, arg1, arg2 }),
   // Used by AlertDesigner component to show draggable, clickable alert overlay

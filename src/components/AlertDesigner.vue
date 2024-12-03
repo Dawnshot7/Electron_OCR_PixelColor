@@ -1,6 +1,28 @@
 <template>
   <div class="container mt-4">
-    <h1 class="mb-3">Alert Designer</h1>
+    <!-- Component Heading -->
+    <div class="d-flex align-items-center">
+      <h1 class="mb-3">Alert Designer: </h1>
+
+      <!-- Currently selected item name -->
+      <b-form-input 
+        v-model="renameRegionValue" 
+        class="ml-2" 
+        style="max-width: 150px; max-height: 40px; margin-bottom: 10px; margin-left: 10px" 
+        :placeholder="alertList.regionSelected"
+        maxlength="20">
+      </b-form-input>
+
+      <!-- Rename Button -->
+      <b-button 
+        class="ml-2" 
+        @click="renameRegion(renameRegionValue)"
+        style="max-height: 40px; margin-bottom: 10px;" 
+        size="sm"
+        variant="light">
+        Rename
+      </b-button>
+    </div>
     <b-row>
 
       <!-- Left column with listbox of alerts -->
@@ -95,8 +117,7 @@
             <b-row class="mt-3">
               <b-form-group label="Alert Text" label-for="alertText">
                 <div class="d-flex align-items-center">
-                  <b-form-input id="alertText" v-model="alertConfig.content" placeholder="Enter alert text"></b-form-input>
-                  <b-button @click="updateAlertText(alertConfig.content)" variant="success">Submit</b-button>
+                  <b-form-input id="alertText" v-model="alertConfig.content" @input="updateAlertText" placeholder="Enter alert text" maxlength="30"></b-form-input>
                 </div>
               </b-form-group>
             </b-row>
@@ -155,24 +176,32 @@ export default {
         { value: 'Blue', text: 'Blue' },
         { value: 'Yellow', text: 'Yellow' },
       ],
+      renameRegionValue: ''
     };
   },
   methods: {
     regionChange(newSelection) {
       // Change alert being displayed and have main.js send back the new alert's config data
       this.alertList.regionSelected = newSelection;
-      window.electronAPI.updateVariable('alerts', 'selected', { regionSelected: newSelection });
+      window.electronAPI.updateVariable('update', 'alerts', 'selected', { regionSelected: newSelection });
     },
     addRegion() {
-      // Add a new alert to the listbox
-      let lastNumber = 0;
-      const lastItemName = this.alertList.regions[this.alertList.regions.length - 1];
-      const match = lastItemName.match(/(\d+)$/);
-      lastNumber = parseInt(match[1], 10);
-      const newRegion = `alert${lastNumber + 1}`;
+      // Find the highest number at the end of existing alert names, create new unique alert name, add to regions list
+      let highestNumber = 0;
+      this.alertList.regions.forEach(region => {
+        const match = region.match(/alert(\d+)$/); // Match names ending in 'alert<number>'
+        if (match) {
+          const number = parseInt(match[1], 10);
+          if (number > highestNumber) {
+            highestNumber = number;
+          }
+        }
+      });
+      const newRegion = `alert${highestNumber + 1}`;
       this.alertList.regions.push(newRegion);
       // Switch to new alert. Main.js will add a new alert in config.ini and send back default config settings
-      this.regionChange(newRegion);
+      this.alertList.regionSelected = newRegion;
+      window.electronAPI.updateVariable('add', 'alerts', 'selected', { regionSelected: newRegion });
     },
     deleteRegion() {
       // Delete current alert from the listbox
@@ -181,31 +210,36 @@ export default {
         this.alertList.regions.splice(index, 1);
         const serializableRegions = toRaw(this.alertList);
         // Sending alertList with the current alert deleted, which will request main.js to delete the alert data from config.ini
-        window.electronAPI.updateVariable('alerts', 'selected', serializableRegions);
+        window.electronAPI.updateVariable('delete', 'alerts', 'selected', serializableRegions);
       }  
+    },
+    renameRegion(newName) {
+      const serializableConfig = toRaw(this.alertConfig);
+      window.electronAPI.updateVariable('rename', 'alerts', newName, serializableConfig );
+      this.renameRegionValue = '';
     },
     showDraggableOverlay() {
       // Display overlay.html with all alerts clickable and draggable. Dropping an alert sends new coords to main.js to update config.ini
       window.electronAPI.showDraggableOverlay();
       console.log('Showed draggable overlay');
     },
-    updateAlertText(text) {
+    updateAlertText() {
       // After user clicks submit button to change alert text, send new text to main.js to update config.ini
-      window.electronAPI.updateVariable('alerts', this.alertList.regionSelected, { content: text });
+      window.electronAPI.updateVariable('update', 'alerts', this.alertList.regionSelected, { content: this.alertConfig.content });
     },    
     updateAlertColor(color) {
       // After user selects new alert color, send new color to main.js to update config.ini
-      window.electronAPI.updateVariable('alerts', this.alertList.regionSelected, { color: color });
+      window.electronAPI.updateVariable('update', 'alerts', this.alertList.regionSelected, { color: color });
     },
     adjustFontSize(delta) {
       // After user clicks increment font size buttons, send new size to main.js to update config.ini
       this.alertConfig.textSize = Math.max(12, Math.min(192, this.alertConfig.textSize + delta));
-      window.electronAPI.updateVariable('alerts', this.alertList.regionSelected, { textSize: this.alertConfig.textSize });
+      window.electronAPI.updateVariable('update', 'alerts', this.alertList.regionSelected, { textSize: this.alertConfig.textSize });
     },
   },
   mounted() {
     // Trigger main.js to send alertList and alertConfig on component load (whenever 'selected' is sent by updateVariable as second parameter)
-    window.electronAPI.updateVariable('alerts', 'selected', { live: false });
+    window.electronAPI.updateVariable('update', 'alerts', 'selected', { live: false });
 
     // Listen for variable updates to populate the form fields
     window.electronAPI.onupdateConfig(({ component, selectedValues }) => {

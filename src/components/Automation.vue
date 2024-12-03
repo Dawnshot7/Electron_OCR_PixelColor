@@ -1,15 +1,37 @@
 <template>
   <div class="container mt-4">
-    <h1 class="mb-3">Automation</h1>
+    <!-- Component Heading -->
+    <div class="d-flex align-items-center">
+      <h1 class="mb-3">Automation: </h1>
+
+      <!-- Currently selected item name -->
+      <b-form-input 
+        v-model="renameRegionValue" 
+        class="ml-2" 
+        style="max-width: 150px; max-height: 40px; margin-bottom: 10px; margin-left: 10px" 
+        :placeholder="automationList.regionSelected"
+        maxlength="20">
+      </b-form-input>
+
+      <!-- Rename Button -->
+      <b-button 
+        class="ml-2" 
+        @click="renameRegion(renameRegionValue)"
+        style="max-height: 40px; margin-bottom: 10px;" 
+        size="sm"
+        variant="light">
+        Rename
+      </b-button>
+    </div>
     <b-row>
 
-      <!-- Left column with listbox of alerts -->
+      <!-- Left column with listbox of automations -->
       <b-col cols="3" md="3" style="min-width: 200px;">
         <div 
           class="list-group listbox-container" 
           style="max-height: 460px; overflow-y: auto;"
         >
-          <!-- Render active alert buttons -->
+          <!-- Render active automation buttons -->
           <button
             v-for="region in automationList.regions"
             :key="region"
@@ -250,7 +272,10 @@
         >
           Toggle Automation
         </b-button>
-        <p>Currently selected automation will be used if no error messages. <br>Shortcut: Ctrl-Shift-A</p>
+        <p>Shortcut: Ctrl-Shift-A<br>
+          Currently selected automation will be used if no error messages.<br>
+          Hold Ctrl or Shift to pause 
+        </p>
       </b-col>
     </b-row>
   </div>
@@ -276,34 +301,40 @@ export default {
         gcdError: '',
         defaultButtonError: '',
       },
+      renameRegionValue: ''
     };
   },
   methods: {
     saveConfig() {
       // Submits all automationConfig data from selected automation to main.js before start of automation 
       const serializableConfig = toRaw(this.automationConfig);
-      window.electronAPI.updateVariable('automation', this.automationList.regionSelected, serializableConfig );
+      window.electronAPI.updateVariable('update', 'automation', this.automationList.regionSelected, serializableConfig );
     },
     regionChange(newSelection) {
       // Submits all automationConfig data from previously selected automation to main.js to update config.ini
       this.saveConfig();
-      console.log(`Sent automationConfig: `, JSON.stringify(serializableConfig));
 
       // Change automation being displayed and signal main.js to send back the new automation's config data
       this.automationList.regionSelected = newSelection;
-      window.electronAPI.updateVariable('automation', 'selected', { regionSelected: newSelection });
+      window.electronAPI.updateVariable('update', 'automation', 'selected', { regionSelected: newSelection });
     },
     addRegion() {
-      // Add a new automation to the listbox with a unique name
-      const lastItemName = this.automationList.regions[this.automationList.regions.length - 1];
-      const match = lastItemName.match(/(\d+)$/);
-      let lastNumber = 0;
-      lastNumber = parseInt(match[1], 10);
-      const newRegion = `automation${lastNumber + 1}`;
+      // Find the highest number at the end of existing alert names, create new unique alert name, add to regions list
+      let highestNumber = 0;
+      this.automationList.regions.forEach(region => {
+        const match = region.match(/automation(\d+)$/); // Match names ending in 'alert<number>'
+        if (match) {
+          const number = parseInt(match[1], 10);
+          if (number > highestNumber) {
+            highestNumber = number;
+          }
+        }
+      });
+      const newRegion = `automation${highestNumber + 1}`;
       this.automationList.regions.push(newRegion);
-
       // Switch to new automation. Main.js will add a new automation in config.ini and send back default config settings
-      this.regionChange(newRegion);
+      this.automationList.regionSelected = newRegion;
+      window.electronAPI.updateVariable('add', 'automation', 'selected', { regionSelected: newRegion });      
     },
     deleteRegion() {
       // Delete currently selected automation from the listbox
@@ -315,9 +346,14 @@ export default {
         const serializableRegions = toRaw(this.automationList);
 
         // Sending automationList with the current automation deleted, which will request main.js to delete the alert data from config.ini
-        window.electronAPI.updateVariable('automation', 'selected', serializableRegions);
+        window.electronAPI.updateVariable('delete', 'automation', 'selected', serializableRegions);
         console.log(`Sent automationList: `, JSON.stringify(serializableRegions));
       }  
+    },
+    renameRegion(newName) {
+      const serializableConfig = toRaw(this.automationConfig);
+      window.electronAPI.updateVariable('rename', 'automation', newName, serializableConfig );
+      this.renameRegionValue = '';
     },
     addAlert(operationIndex) {
       // Add alert to respective operation. Operation's v-for loop will display a new listbox for alert selection.
@@ -425,12 +461,12 @@ export default {
       }
       // Toggles the activation of automation in the main.js setInterval. Main.js will display the alert overlay when automation starts if it isn't already visible.
       this.automationList.live = !this.automationList.live;
-      window.electronAPI.updateVariable('automation', 'selected', { live: this.automationList.live });
+      window.electronAPI.updateVariable('update', 'automation', 'selected', { live: this.automationList.live });
     }
   },
   mounted() {
     // Signals main.js to send automationList and automationConfig on component load (whenever 'selected' is sent by updateVariable as second parameter)
-    window.electronAPI.updateVariable('automation', 'selected', { live: false });
+    window.electronAPI.updateVariable('update', 'automation', 'selected', { live: false });
 
     // Listen for variable updates to populate the automationConfig data and the component's form fields
     window.electronAPI.onupdateConfig(({ component, selectedValues }) => {
@@ -453,7 +489,7 @@ export default {
   unmounted() {
     // Submits all automationConfig data from selected automation to main.js to update config.ini
     const serializableConfig = toRaw(this.automationConfig);
-    window.electronAPI.updateVariable('automation', this.automationList.regionSelected, serializableConfig );
+    window.electronAPI.updateVariable('update', 'automation', this.automationList.regionSelected, serializableConfig );
     console.log(`sent config: `, JSON.stringify(serializableConfig));
   }
 };

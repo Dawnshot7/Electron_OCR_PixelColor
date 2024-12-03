@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Used by hideDraggableOverlay button to tell main.js to hide the overlay and show the main electron window
     hideDraggableOverlay: () => ipcRenderer.send('hideDraggableOverlay'),
     // Used to update variables in main.js and config.ini upon changes in the position of alerts after dragging
-    updateVariable: (variableName, key, value) => ipcRenderer.send('update-variable', { variableName, key, value }),
+    updateVariable: (action, currentComponent, key, value) => ipcRenderer.send('update-variable', { action, currentComponent, key, value }),
 
     // Used by main.js to initialize all alerts on load
     onInitAlerts: (callback) => ipcRenderer.on('initAlerts', (event, data) => callback(data)),
