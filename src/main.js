@@ -24,6 +24,7 @@ const basePath = isDev
 // Use basePath to construct all paths used in main.js
 const defaultProfilePath = path.join(basePath, 'config/profileDefault.ini');
 const pixelsDefaultImagePath = path.join(basePath, 'assets/pixelsDefault.png');
+const ocrDefaultImagePath = path.join(basePath, 'assets/ocrDefault.png');
 const overlayHTMLPath = path.join(basePath, 'renderer/overlay.html');
 const indexHTMLPath = path.join(basePath, 'renderer/index.html');
 const unmodifiedImagePath = path.join(basePath, `assets/unmodifiedImage.png`);
@@ -771,24 +772,37 @@ async function runAhkScript(scriptName, arg1, arg2) {
     const output = data.toString().trim();
     if (output) {
       if (scriptName === 'getBoxCoords') {
-        // Put stdout into variables for the new top left and bottom right corners of the currently selected OCR region box
+        // Parse the coordinates
         const [x1, y1, x2, y2] = output.split(" ").map(Number);
-        console.log(`Setting OCR region to: (${x1}, ${y1}) to (${x2}, ${y2})`);
-
-        // Update coordinates for currently selected OCR region
-        const thisRegion = state['ocrRegions']['selected'].regionSelected
+        console.log(`Original coordinates: (${x1}, ${y1}) to (${x2}, ${y2})`);
+    
+        // Determine the top-left and bottom-right corners dynamically
+        const topLeftX = Math.min(x1, x2);
+        const topLeftY = Math.min(y1, y2);
+        const bottomRightX = Math.max(x1, x2);
+        const bottomRightY = Math.max(y1, y2);
+    
+        // Calculate width and height
+        const width = bottomRightX - topLeftX;
+        const height = bottomRightY - topLeftY;
+    
+        console.log(`Setting OCR region to: (${topLeftX}, ${topLeftY}) with width ${width} and height ${height}`);
+    
+        // Update coordinates for the currently selected OCR region
+        const thisRegion = state['ocrRegions']['selected'].regionSelected;
         const thisData = {
-          x: x1,
-          y: y1,
-          width: Math.abs(x2 - x1),
-          height: Math.abs(y2 - y1)
+            x: topLeftX,
+            y: topLeftY,
+            width,
+            height
         };
         state['ocrRegions'][thisRegion] = { ...state['ocrRegions'][thisRegion], ...thisData };
-      
-        // Perform OCR and send the recognized text and new OCR region configuration settings to the renderer
+    
+        // Perform OCR and send recognized text and new OCR region configuration to the renderer
         const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][thisRegion]);
-        await fsPromises.copyFile(unmodifiedImagePath,path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${thisRegion}.png`));
+        await fsPromises.copyFile(unmodifiedImagePath, path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${thisRegion}.png`));
         win.webContents.send('ocrText', { ocrText });
+    
         const component = 'ocrRegions';
         win.webContents.send('updateConfig', { component, thisData });
         console.log('Image processed and saved successfully');
@@ -797,8 +811,8 @@ async function runAhkScript(scriptName, arg1, arg2) {
         const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
         const modifiedImageData = fs.readFileSync(modifiedImagePath);
         win.webContents.send('updateImages', { unmodifiedImageData, modifiedImageData });
-        console.log('Sent both images'); 
-      } else if (scriptName === 'getPixelCoords'){
+        console.log('Sent both images');
+    } else if (scriptName === 'getPixelCoords'){
         // Put stdout into variables for the new coordinate of the currently selected pixel
         const [x1, y1] = output.split(" ").map(Number);
 
@@ -861,10 +875,15 @@ ipcMain.on('update-variable', async (event, { action, currentComponent, key, val
         state[currentComponent][region] = { ...state[currentComponent][`${currentComponent}Default`] };
         // Add the region to the regions list
         state[currentComponent]['selected'].regions.push(region);
-        // After new region addition, copy the default image saying "No pixel selected" to the region's image filename 
-        if (currentComponent === 'pixelCoords' || currentComponent === 'ocrRegions') {
+        // After new region addition, copy the default image saying "No pixel selected" or "No OCR box selected" to the region's image filename 
+        if (currentComponent === 'pixelCoords') {
           if (!fs.existsSync(regionImagePath)) {
             fs.copyFileSync(pixelsDefaultImagePath, regionImagePath);
+          }
+        }
+        if (currentComponent === 'ocrRegions') {
+          if (!fs.existsSync(regionImagePath)) {
+            fs.copyFileSync(ocrDefaultImagePath, regionImagePath);
           }
         }
       } 
