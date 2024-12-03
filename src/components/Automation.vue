@@ -77,12 +77,30 @@
         <div class="operations-config">
           <!-- GCD Input -->
           <div class="gcd-input">
+
             <label :class="{ 'invalid-label': automationConfig.gcdError }" for="gcd"
                    :style="{ fontSize: '18px', fontWeight: 'bold' }"
             >
               Global Cooldown (seconds):
+
+              <!-- Tooltip -->
+              <i 
+                id="tooltipIcon" 
+                class="ml-2 question-mark"  
+                v-b-tooltip.hover 
+                title="Interval between buttons that will be 
+pressed to simulate user input in the
+game. All conditions are evaluated
+each interval, and based on alerts
+displayed, operations below will be 
+evaluated, in order, to decide button 
+choice. 0.5s is the minimum possible 
+interval.">?
+              </i>
+
               <span v-if="automationConfig.gcdError" class="error-text">{{ automationConfig.gcdError }}</span>
             </label>
+
             <input
               id="gcd"
               v-model="automationConfig.gcd"
@@ -245,7 +263,31 @@
         
       </b-col>
       <b-col cols="3" md="3">
-        <h3>Operation example</h3>
+
+        <div style="display: flex; align-items: center;">
+          <h3>Operation example</h3>
+        
+          <!-- Tooltip -->
+          <i 
+            id="tooltipIcon" 
+            class="ml-2 question-mark"  
+            v-b-tooltip.hover 
+            title="Each alert chosen represents the output  
+of a condition evaluating true. Any
+amount of alerts can be used together
+to decide if a button should be 
+pressed. Use the logical expression
+to state how the alerts should 
+contribute to each decision. Alerts
+are enumerated in this expression. The 
+operations will be evaluated from
+top to bottom, and the first to
+evaluate true will be the button
+chosen. If none evaluate true then
+the default button will be pressed.">?
+          </i>
+        </div>
+
         <span>1: alert3<br></span>
         <span>2: alert5<br></span>
         <span>3: alert6<br></span>

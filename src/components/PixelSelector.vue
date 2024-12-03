@@ -136,6 +136,19 @@
             <b-row class="mt-3">
               <div class="d-flex justify-content-center">
                 <b-form-checkbox v-model="pixelList.live" @change="toggleLive">Live pixel color</b-form-checkbox>
+
+                <!-- Tooltip -->
+                <i 
+                  id="tooltipIcon" 
+                  class="ml-2 question-mark"  
+                  v-b-tooltip.hover 
+                  title="For testing purposes, the color of 
+selected pixel will updated on this 
+window every 0.5s and represented 
+as the above font color and compared 
+to the saved color.">?
+                </i>
+                
               </div>
             </b-row>
 

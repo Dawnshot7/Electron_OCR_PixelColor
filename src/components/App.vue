@@ -244,4 +244,25 @@ button:hover {
 button:focus {
   outline: none; /* Remove default outline */
 }
+
+/* Question mark style */
+.question-mark {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #ddd; /* Light gray background */
+  color: #333; /* Dark text color */
+  text-align: center;
+  text-justify: center;
+  margin-left: 5px;
+  line-height: 20px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.question-mark:hover {
+  background-color: #bbb; /* Slightly darker background on hover */
+}
 </style>

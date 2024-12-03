@@ -161,8 +161,20 @@
             <b-row class="mt-3">
               <div class="d-flex justify-content-center">
                 <b-form-checkbox v-model="ocrList.live" @change="toggleLive">Live OCR</b-form-checkbox>
+
+                <!-- Tooltip -->
+                <i 
+                  id="tooltipIcon" 
+                  class="ml-2 question-mark"  
+                  v-b-tooltip.hover 
+                  title="For testing purposes, images and OCR 
+text will be updated on this window 
+every 0.5s based on contents of 
+screenshot.">?
+                </i>
+                
               </div>
-            </b-row>
+            </b-row>   
 
             <!-- Invert Checkbox -->
             <b-row class="mt-3">

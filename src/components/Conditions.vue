@@ -106,6 +106,17 @@
               <!-- Add and delete pixel condition buttons -->
               <b-button @click="addPixelCoord" variant="success" size="sm" :style="{ marginRight: '10px'}">Add Pixel</b-button>
               <b-button @click="deletePixelCoord" variant="success" size="sm" >Remove Pixel</b-button>
+
+              <!-- Tooltip -->
+              <i 
+                id="tooltipIcon" 
+                class="ml-2 question-mark"  
+                v-b-tooltip.hover 
+                title="Add saved pixel colors to be evaluated 
+together to determine if alert should 
+be shown">?
+              </i>
+
             </div>
 
             <!-- Select alert that will be shown when condition is true -->
@@ -118,8 +129,24 @@
             </b-form-group>
 
             <!-- Select alert that will be shown when condition is true -->
-            <h4 :style="{ marginTop: '20px' }">Suppression Option</h4>
+            <div style="display: flex; align-items: center;">
+              <h4 :style="{ marginTop: '20px' }">Suppression Option</h4>
+
+              <!-- Tooltip -->
+              <i 
+                id="tooltipIcon" 
+                class="ml-2 question-mark"  
+                v-b-tooltip.hover 
+                title="Can be used when ability cooldown or buff 
+duration is known. Condition must return 
+to false again before alert suppression 
+timer can be reapplied.">?
+              </i>
+
+            </div>
+
             <b-form-group label="If non-zero, condition instead hides alert for this many seconds:">
+
               <span v-if="conditionConfig.timerError" class="error-text">
                 {{ conditionConfig.timerError }}
               </span>
@@ -130,7 +157,7 @@
             <b-row class="d-flex justify-content-center">
               <b-button @click="toggleGameModeOverlay" variant="warning" :style="{ width: 'auto', marginTop: '20px' }">Toggle Active Alerts</b-button>
               <div class="d-flex justify-content-center">
-                <p :style="{ textAlign: 'center', width: '75%' }">Start/stop evaluating conditions and displaying active alerts. <br>Shortcut: Ctrl-Shift-S</p>
+                <p :style="{ textAlign: 'center', width: '75%' }">Start/stop evaluating conditions every 0.5s and displaying active alerts. <br>Shortcut: Ctrl-Shift-S</p>
               </div>
             </b-row>
 
@@ -143,7 +170,26 @@
             <h4>OCR Conditions</h4>
             <b-button @click="addOcrCondition" variant="success" size="sm" :style="{ marginRight: '10px'}">Add OCR</b-button>
             <b-button @click="deleteOcrCondition" variant="success" size="sm">Remove OCR</b-button>
-            
+
+            <!-- Tooltip -->
+            <i 
+              id="tooltipIcon" 
+              class="ml-2 question-mark"  
+              v-b-tooltip.hover 
+              title="Add an OCR region to be evaluated with 
+regex. Match groups will be compared to 
+text or numbers to determine if alert 
+should be shown. Standard regular 
+expression syntax. For each set of 
+parenthesis, a match group and 
+text/numbers to compare to the match 
+must be defined below. For less than, 
+greater than, and between comparisons 
+the regex match group must find a 
+number. Use .*?(\d+).* as your regex 
+to isolate digits.">?
+            </i>
+
             <!-- Dynamic ocr selector fields appear below when the Add OCR button above is clicked -->
             <div v-if="conditionConfig.ocrRegions !== ''">
 
@@ -157,6 +203,7 @@
 
               <!-- Regex Input -->
               <b-form-group label="Regex Pattern: Use (.*) if unsure">
+
                 <span v-if="conditionConfig.regexError" class="error-text">
                   {{ conditionConfig.regexError }}
                 </span>
@@ -183,7 +230,7 @@
                   <b-form-select
                     v-model="match[0]"
                     @input="validateMatch(index)"
-                    :options="['equals', 'notEquals', 'lessThan', 'greaterThan', 'between']"
+                    :options="['equals', 'not equals', 'less than', 'greater than', 'between']"
                   ></b-form-select>
                   </b-col>
                   <b-col cols="4">
@@ -206,8 +253,9 @@
                 </div>
 
                 <!-- Add and delete matches buttons -->
-                <b-button @click="addMatch" variant="success" size="sm" :style="{ marginRight: '10px'}">Add Match Group</b-button>
-                <b-button @click="deleteMatch" variant="success" size="sm">Remove Match Group</b-button>
+                <b-button @click="addMatch" variant="success" size="sm" :style="{ marginRight: '10px'}">Add Match</b-button>
+                <b-button @click="deleteMatch" variant="success" size="sm">Remove Match</b-button>
+
               </div>
             </div>
 
