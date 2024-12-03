@@ -576,12 +576,12 @@ async function evaluateConditions() {
                   truecount += matchedText === target[1] ? 1 : 0;
                   falsecount += matchedText !== target[1] ? 1 : 0;
                   break;
-                case 'notEquals':
+                case 'not equals':
                   truecount += matchedText !== target[1] ? 1 : 0;
                   falsecount += matchedText === target[1] ? 1 : 0;
                   break;
-                case 'lessThan':
-                case 'greaterThan':
+                case 'less than':
+                case 'greater than':
                 case 'between': {
                   const numericValue = parseInt(matchedText, 10);
                   const target1 = parseInt(target[1], 10);
@@ -593,8 +593,8 @@ async function evaluateConditions() {
                   }
 
                   if (
-                    (target[0] === 'lessThan' && numericValue < target1) ||
-                    (target[0] === 'greaterThan' && numericValue > target1) ||
+                    (target[0] === 'less than' && numericValue < target1) ||
+                    (target[0] === 'greater than' && numericValue > target1) ||
                     (target[0] === 'between' && numericValue >= target1 && numericValue <= target2)
                   ) {
                     truecount++;
@@ -631,7 +631,7 @@ async function evaluateConditions() {
         if (x && y) {
           const colorAtPixel = robot.getPixelColor(x, y);
           const matches = (comparison === "equals" && colorAtPixel === color) || 
-                          (comparison === "notEquals" && colorAtPixel !== color);
+                          (comparison === "not equals" && colorAtPixel !== color);
           if (matches) truecount++;
           else falsecount++;
         } 

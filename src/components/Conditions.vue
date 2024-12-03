@@ -97,7 +97,7 @@
                 <b-col cols="6">
                 <b-form-select
                   v-model="conditionConfig.pixelComparison[index]"
-                  :options="['equals', 'notEquals']"
+                  :options="['equals', 'not equals']"
                 ></b-form-select>
                 </b-col>
               </b-row>
