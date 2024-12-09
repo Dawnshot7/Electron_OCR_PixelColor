@@ -284,47 +284,52 @@ function createWindow() {
   win.loadFile(indexHTMLPath);
   //win.webContents.openDevTools();
 
-  // Initialize alert list used in evaluateConditions()
-  let previousAlertList = ['initial'];
 
-  // Interval ID for dynamic control
-  let intervalId;
+  let previousAlertList = ['initial'];   // Initialize alert list used in evaluateConditions()
+  let intervalId; // Interval ID for dynamic control
+  let intervalOffset = 0; // Initialize offset to 0
+  let isIntervalRunning = false; // Guard to prevent overlapping intervals
 
   // Function to update the interval dynamically
   function startInterval() {
-    if (intervalId) clearInterval(intervalId); // Clear any existing interval
+    if (isIntervalRunning) {
+      console.log("Interval already running. Skipping restart.");
+      return;
+    }
 
+    isIntervalRunning = true; // Mark interval as running
     const live = state.automation.selected.live;
     const gcd = state.automation[state.automation.selected.regionSelected]?.gcd || 1.5; // Default GCD
-    const interval = live ? gcd * 1000 : 500; // If automation is live, interval will be set to GCD in ms; Not live: 500ms
-
+    let interval = live ? gcd * 1000 : 500; // Base interval
+  
+    const durations = []; // Rolling window for iteration durations
+    const adjustmentStep = 100; // Increment for interval adjustments
+  
     intervalId = setInterval(async () => {
+      const startTime = Date.now(); // Mark the start of the iteration
+  
       try {
         // If automation is turned on by shortcut while condition evaluation is not active and overlay is not visible
         if (state['automation']['selected'].live && !state['conditions']['selected'].live) {
           toggleGameModeOverlay();
         }
-
+  
         // Evaluate all conditions and update visible alerts. If automation is live, press buttons with autohotkey
         if (state['conditions']['selected'].live) {
           const alertList = await evaluateConditions();
-
           // If automation is live, run automate to determine what button to press, and press it with sendInput.ahk
-          if (state['automation']['selected'].live) {            
-            const button = await automate(alertList)
+          if (state['automation']['selected'].live) {
+            const button = await automate(alertList);
             console.log(button);
             await runAhkScript('sendInput', button, '');
             alertList.push('alertAutomation');
           }
-
           alertList.push('alertOverlay');
-          //if (JSON.stringify(previousAlertList) !== JSON.stringify(alertList)) {
-            overlayWindow.webContents.send('updateVisibleAlerts', alertList);
-            console.log(`Alert list: `, alertList);
-            previousAlertList = alertList;
-          //}
+          overlayWindow.webContents.send('updateVisibleAlerts', alertList);
+          console.log(`Alert list: `, alertList);
+          previousAlertList = alertList;
         }
-
+  
         // Get the live pixel color when Pixel Selector component live mode is active
         if (state['pixelCoords']['selected'].live) {
           const selectedRegion = state['pixelCoords']['selected'].regionSelected;
@@ -333,13 +338,12 @@ function createWindow() {
           const liveColor = robot.getPixelColor(selectedX, selectedY);
           win.webContents.send('pixelColor', { liveColor });
         }
-
+  
         // Perform live OCR when OCR Configurator component live mode is active
         if (state['ocrRegions']['selected'].live) {
           const selectedRegion = state['ocrRegions']['selected'].regionSelected;
           const ocrText = await captureAndProcessScreenshot(state['ocrRegions'][selectedRegion]);
           win.webContents.send('ocrText', { ocrText });
-
           // Send the updated images
           const unmodifiedImageData = fs.readFileSync(unmodifiedImagePath);
           const modifiedImageData = fs.readFileSync(modifiedImagePath);
@@ -347,12 +351,36 @@ function createWindow() {
         }
       } catch (error) {
         console.error("Error during condition evaluation:", error);
+      } finally {
+        const duration = Date.now() - startTime; // Calculate iteration duration
+        durations.push(duration);
+        if (durations.length > 5) durations.shift(); // Keep only the last 5 durations
+  
+        // Calculate the average duration of the last 5 iterations
+        const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
+  
+        // Adjust intervalOffset dynamically
+        if (avgDuration >= (interval + intervalOffset) * 0.9) {
+          intervalOffset += adjustmentStep; // Increase offset
+          console.warn(`Increasing interval offset ${interval} to ${intervalOffset}ms due to high load.`);
+        } else if (avgDuration <= (interval + intervalOffset) * 0.75 && intervalOffset > 0) {
+          intervalOffset = Math.max(0, intervalOffset - adjustmentStep); // Decrease offset, minimum 0
+          console.info(`Decreasing interval offset ${interval} to ${intervalOffset}ms as load is manageable.`);
+        }
+  
       }
-    }, interval);
+    }, interval + intervalOffset); // Use the effective interval
+    console.log("Interval started with effective interval:", interval + intervalOffset);
   }
-
-  // Start the interval and listen for state changes to dynamically adjust it
-  startInterval();
+  
+  function stopInterval() {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+      isIntervalRunning = false; // Mark interval as stopped
+      console.log("Interval stopped.");
+    }
+  }
 
   // Example: Listen for changes in state.automation.selected.live or gcd
   // Replace this logic with your state management approach (e.g., Redux, IPC event listeners, etc.)
@@ -362,12 +390,15 @@ function createWindow() {
       // If live state or regionSelected changes, restart the interval
       const live = state.automation.selected.live;
       const gcd = state.automation[state.automation.selected.regionSelected]?.gcd || 1.5;
-      const interval = live ? gcd * 1000 : 500;
+      const expectedInterval = live ? gcd * 1000 : 500;
 
-      if (interval !== (intervalId ? intervalId._idleTimeout : null)) {
-        startInterval(); // Restart interval if conditions change
+      // Restart interval only if the settings have changed
+      if (!isIntervalRunning || expectedInterval !== (intervalId ? intervalId._idleTimeout : null)) {
+        console.log(`Restarting interval due to state change...${isIntervalRunning} ${expectedInterval} ${intervalId} `);
+        stopInterval();
+        startInterval();
       }
-    }, 100); // Check state changes every 100ms
+    }, 500); // Check state changes every 500ms
 
     // Register a global shortcut (e.g., Ctrl+Shift+A)
     globalShortcut.register('Ctrl+Shift+A', () => {

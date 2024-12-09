@@ -343,6 +343,7 @@ to isolate digits.">?
       this.conditionConfig.regex = this.conditionConfig.regex.replace(/\\/g, '~');
       const serializableConfig = toRaw(this.conditionConfig);
       window.electronAPI.updateVariable('rename', 'conditions', newName, serializableConfig );
+      this.renameRegionValue = '';
     },
     addOcrCondition() {
       // Set properties

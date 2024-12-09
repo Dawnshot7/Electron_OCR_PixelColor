@@ -284,7 +284,16 @@ operations will be evaluated from
 top to bottom, and the first to
 evaluate true will be the button
 chosen. If none evaluate true then
-the default button will be pressed.">?
+the default button will be pressed. 
+Multiple characters can be entered as 
+button to press, and they will be sent 
+to the game window in immediate 
+succession. If you enter the strings: 
+enter, space, tab, backspace, delete, 
+up, down, left, right, home, end, pgup, 
+pgdn, esc, f1, or f2, the respective 
+button will be sent to the game window 
+in place of the string of characters.">?
           </i>
         </div>
 
@@ -359,6 +368,7 @@ export default {
       // Change automation being displayed and signal main.js to send back the new automation's config data
       this.automationList.regionSelected = newSelection;
       window.electronAPI.updateVariable('update', 'automation', 'selected', { regionSelected: newSelection });
+      this.renameRegionValue = '';
     },
     addRegion() {
       // Find the highest number at the end of existing alert names, create new unique alert name, add to regions list

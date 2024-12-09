@@ -189,6 +189,7 @@ export default {
       // Change pixel coordinate being displayed and have main.js send back the new pixel's config data
       this.pixelList.regionSelected = newSelection;
       window.electronAPI.updateVariable('update', 'pixelCoords', 'selected', { regionSelected: newSelection });
+      this.renameRegionValue = '';
     },
     addRegion() {
       // Find the highest number at the end of existing alert names, create new unique alert name, add to regions list

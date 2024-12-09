@@ -270,6 +270,7 @@ export default {
       // Change OCR region being displayed and have main.js send back the new box's config data
       this.ocrList.regionSelected = newSelection;
       window.electronAPI.updateVariable('update', 'ocrRegions', 'selected', { regionSelected: newSelection });
+      this.renameRegionValue = '';
     },
     addRegion() {
       // Find the highest number at the end of existing alert names, create new unique alert name, add to regions list

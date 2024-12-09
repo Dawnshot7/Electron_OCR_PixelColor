@@ -184,6 +184,7 @@ export default {
       // Change alert being displayed and have main.js send back the new alert's config data
       this.alertList.regionSelected = newSelection;
       window.electronAPI.updateVariable('update', 'alerts', 'selected', { regionSelected: newSelection });
+      this.renameRegionValue = '';
     },
     addRegion() {
       // Find the highest number at the end of existing alert names, create new unique alert name, add to regions list
