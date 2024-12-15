@@ -532,6 +532,45 @@ async function processAndSaveModifiedImage(inputPath, outputPath, { brightness, 
   }
 }
 
+// Add crosshairs and save the modified image using Jimp
+async function processImageWithCrosshairs(inputPath, outputPath) {
+  try {
+    const image = await Jimp.read(inputPath);
+
+    // Crosshair properties
+    const crosshairColor = Jimp.cssColorToHex('#808080'); // Grey color
+    const lineThickness = 2;
+    const centerX = Math.floor(image.getWidth() / 2);
+    const centerY = Math.floor(image.getHeight() / 2);
+
+    // Draw vertical line (center column)
+    for (let dx = 0; dx < lineThickness; dx++) {
+      const x = centerX - Math.floor(lineThickness / 2) + dx;
+      if (x >= 0 && x < image.getWidth()) {
+        image.scan(x, 0, 1, image.getHeight(), (x, y, idx) => {
+          image.bitmap.data.writeUInt32BE(crosshairColor, idx);
+        });
+      }
+    }
+
+    // Draw horizontal line (center row)
+    for (let dy = 0; dy < lineThickness; dy++) {
+      const y = centerY - Math.floor(lineThickness / 2) + dy;
+      if (y >= 0 && y < image.getHeight()) {
+        image.scan(0, y, image.getWidth(), 1, (x, y, idx) => {
+          image.bitmap.data.writeUInt32BE(crosshairColor, idx);
+        });
+      }
+    }
+
+    // Save the modified image
+    await image.writeAsync(outputPath);
+    console.log('Crosshairs added and image saved successfully:', outputPath);
+  } catch (error) {
+    console.error('Error processing and saving modified image:', error);
+  }
+}
+
 // Function to recognize text from an image file using the OCRAD.js OCR module
 function recognizeTextFromImage(imagePath) {
   return new Promise((resolve, reject) => {
@@ -852,6 +891,8 @@ async function runAhkScript(scriptName, arg1, arg2) {
         const screenshotCoordinates = { x: x1-50, y: y1-50, width: 100, height: 100 };
         const imagePath = path.join(basePath, `assets/${currentProfile.slice(0, -4)}/${thisRegion}.png`);
         await captureScreenshotAsPNG(screenshotCoordinates, imagePath);
+        await processImageWithCrosshairs(imagePath, imagePath);
+
         const imageData = fs.readFileSync(imagePath);
         win.webContents.send('updatePixelImages', { imageData });
 
