@@ -92,7 +92,7 @@ import OCRConfigurator from './OCRConfigurator.vue'; // Handles OCR region confi
 import PixelSelector from './PixelSelector.vue'; // Manages pixel selection for color monitoring by conditions
 import AlertDesigner from './AlertDesigner.vue'; // Designs on-screen alerts to be triggered by conditions 
 import Conditions from './Conditions.vue'; // Configures logical conditions for display of alerts
-import Automation from './Automation.vue'; // Configures logical conditions for display of alerts
+import Automation from './Automation.vue'; // Sets up automation operations which will simulate user keystrokes
 
 export default {
   name: 'App', // Main application container

@@ -92,7 +92,7 @@
 pressed to simulate user input in the
 game. All conditions are evaluated
 each interval, and based on alerts
-displayed, operations below will be 
+displayed, tasks below will be 
 evaluated, in order, to decide button 
 choice. 0.5s is the minimum possible 
 interval.">?
@@ -120,7 +120,57 @@ interval.">?
               v-for="(operation, operationIndex) in automationConfig.operationsList.slice(0, -1)"
               :key="operationIndex"
             >
-              <h3>Operation {{ operationIndex + 1 }}</h3>
+              <h3>Task {{ operationIndex + 1 }}</h3>
+
+              <!-- Buttons Section -->
+              <div>
+
+                <!-- Add Alert Button -->
+                <b-button
+                  type="button"
+                  @click="addAlert(operationIndex)"
+                  class="add-alert-btn"
+                  size="sm"
+                  variant="success"
+                >
+                  Add Alert
+                </b-button>
+
+                <!-- Remove Alert Button -->
+                <b-button
+                  type="button"
+                  @click="deleteAlert(operationIndex)"
+                  class="delete-alert-btn"
+                  size="sm"
+                  variant="success"
+                  :disabled="operation[0].length === 1"
+                >
+                  Remove Alert
+                </b-button>
+
+                <!-- Add Task Button -->
+                <b-button
+                  type="button"
+                  @click="addOperation(operationIndex)"
+                  class="add-operation-btn"
+                  size="sm"
+                  variant="success"
+                >
+                  Add Task
+                </b-button>
+
+                <!-- Remove Task Button -->
+                <b-button
+                  type="button"
+                  @click="deleteOperation(operationIndex)"
+                  class="delete-operation-btn"
+                  size="sm"
+                  variant="success"
+                  :disabled="automationConfig.operationsList.length === 1"
+                >
+                  Remove Task
+                </b-button>
+              </div>
 
               <!-- Alerts Section -->
               <div class="alerts-section">
@@ -148,29 +198,6 @@ interval.">?
                     </option>
                   </select>
                 </div>
-
-                <!-- Add Alert Button -->
-                <b-button
-                  type="button"
-                  @click="addAlert(operationIndex)"
-                  class="add-alert-btn"
-                  size="sm"
-                  variant="success"
-                >
-                  Add Alert
-                </b-button>
-
-                <!-- Remove Alert Button -->
-                <b-button
-                  type="button"
-                  @click="deleteAlert(operationIndex)"
-                  class="delete-alert-btn"
-                  size="sm"
-                  variant="success"
-                  :disabled="operation[0].length === 1"
-                >
-                  Remove Alert
-                </b-button>
               </div>
 
               <!-- Condition Input -->
@@ -218,7 +245,7 @@ interval.">?
             <!-- Add Operation Button -->
             <b-button
               type="button"
-              @click="addOperation"
+              @click="addOperation(automationConfig.operationsList.length)"
               class="add-operation-btn"
               variant="success"
             >
@@ -228,7 +255,7 @@ interval.">?
             <!-- Delete Operation Button -->
             <b-button
               type="button"
-              @click="deleteOperation()"
+              @click="deleteOperation(automationConfig.operationsList.length-1)"
               class="delete-operation-btn"
               variant="success"
               :disabled="automationConfig.operationsList.length === 1"
@@ -265,7 +292,7 @@ interval.">?
       <b-col cols="3" md="3">
 
         <div style="display: flex; align-items: center;">
-          <h3>Operation example</h3>
+          <h3>Task example</h3>
         
           <!-- Tooltip -->
           <i 
@@ -280,7 +307,7 @@ pressed. Use the logical expression
 to state how the alerts should 
 contribute to each decision. Alerts
 are enumerated in this expression. The 
-operations will be evaluated from
+tasks will be evaluated from
 top to bottom, and the first to
 evaluate true will be the button
 chosen. If none evaluate true then
@@ -427,19 +454,19 @@ export default {
       // Save after every change to automation config
       this.saveConfig();
     },
-    addOperation() {
+    addOperation(operationIndex) {
       // Add operation to end of list of operations (before default) and error tracking list. A v-for loop will display the new operation's config fields.
-      const lastIndex = this.automationConfig.operationsList.length - 1;
       const defaultAlert = this.automationList.alertRegions[0] || ''; 
-      this.automationConfig.operationsList.splice(lastIndex, 0, [[defaultAlert], '', '']);
-      this.automationConfig.conditionErrors.splice(lastIndex, 0, '');
+      this.automationConfig.operationsList.splice(operationIndex, 0, [[defaultAlert], '', '']);
+      this.automationConfig.conditionErrors.splice(operationIndex, 0, '');
+      this.automationConfig.buttonErrors.splice(operationIndex, 0, '');
       
       // Set error labels for empty fields
-      this.validateCondition(lastIndex);
-      this.validateButton(lastIndex);
+      this.validateCondition(operationIndex);
+      this.validateButton(operationIndex);
       this.saveConfig();
     },
-    deleteOperation() {
+    deleteOperation(operationIndex) {
       // Must be a minimum of one operation besides the default
       const isLastNonDefault = this.automationConfig.operationsList.length === 1;
       if (isLastNonDefault) {
@@ -447,8 +474,9 @@ export default {
       }
 
       // Remove automation from list of automations and error tracking list
-      this.automationConfig.operationsList.splice(this.automationConfig.operationsList.length - 2, 1);
-      this.automationConfig.conditionErrors.splice(this.automationConfig.operationsList.length - 2, 1); 
+      this.automationConfig.operationsList.splice(operationIndex, 1);
+      this.automationConfig.conditionErrors.splice(operationIndex, 1); 
+      this.automationConfig.buttonErrors.splice(operationIndex, 1); 
       this.saveConfig();
     },
     validateCondition(operationIndex) {

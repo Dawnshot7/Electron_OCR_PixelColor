@@ -16,10 +16,10 @@ let overlayWindow; // Variable to hold the reference to the transparent alert wi
 let state = {}; // Variable to hold all configuration data from {currentProfile}.ini after JSON.parse is performed in loadConfig()
 
 // Modify basePath to work as the correct path to main.js in both development and production
-const isDev = process.env.NODE_ENV === 'development'; 
-const basePath = isDev 
-  ? __dirname  // In development, use the src folder directly 
-  : path.join(process.resourcesPath, 'app/src'); // Adjust for the packaged app
+const isPackaged = require('electron').app.isPackaged;
+const basePath = isPackaged 
+  ? path.join(process.resourcesPath, 'app/src') // Adjust for the packaged app
+  : __dirname; // In development, use the src folder directly 
 
 // Use basePath to construct all paths used in main.js
 const defaultProfilePath = path.join(basePath, 'config/profileDefault.ini');
@@ -691,6 +691,8 @@ async function evaluateConditions() {
     }
 
     // Evaluate match status of listed pixel's color if the user included an pixel coordinates in this condition    
+    let duration = parseInt(condition.timer, 10);
+
     if (condition.pixelCoords.length > 0) {
       for (let i = 0; i < condition.pixelCoords.length; i++) {
         const pixelCoord = condition.pixelCoords[i];
@@ -701,16 +703,26 @@ async function evaluateConditions() {
         if (x && y) {
           const colorAtPixel = robot.getPixelColor(x, y);
           const matches = (comparison === "equals" && colorAtPixel === color) || 
-                          (comparison === "not equals" && colorAtPixel !== color);
+          (comparison === "not equals" && colorAtPixel !== color);
+
           if (matches) truecount++;
-          else falsecount++;
-        } 
+          else {
+            falsecount++;
+            // A not-equals comparison evaluating to false hides the alert even if a suppression timer is set
+            if (i > 0) {
+              duration = 0;
+              condition.resetNeeded = false;
+              i=condition.pixelCoords.length;
+            }
+          }  
+        } else {
+          console.log('Pixel not in list');
+        }
       }   
     }
 
     // Suppress alerts for conditions on a suppression timer, otherwise evaluate alert display status based on truecount and falsecount.
     const now = Date.now();
-    const duration = parseInt(condition.timer, 10);
     if (duration > 0) {
       // Condition evaluating true triggers alert suppresion for a duration. Needs reset by evaluating false after each true evaluation.
       if ((truecount > 0 && falsecount === 0) && !condition.resetNeeded) { // Reset is not currently needed and condition is triggered
@@ -833,9 +845,8 @@ ipcMain.on('run-ahk-script', async (event, { scriptName, arg1, arg2 }) => {
 async function runAhkScript(scriptName, arg1, arg2) {
   console.log('starting ahk script');
   // getBoxCoords.ahk collects two mouse clicks, getPixelCoords.ahk collects one click
-  const ahkPath = path.join(basePath, '../scripts/AutoHotkeyA32.exe');
-  const ahkScript = path.join(basePath, `../scripts/${scriptName}.ahk`);
-  const ahkProcess = spawn(ahkPath, [ahkScript, arg1, arg2]);
+  const ahkExePath = path.join(basePath, `../scripts/${scriptName}.exe`);
+  const ahkProcess = spawn(ahkExePath, [arg1, arg2]);
 
   // AHK script stdout variable returns mouse click coordinate values
   ahkProcess.stdout.on('data', async (data) => {
@@ -959,6 +970,7 @@ ipcMain.on('update-variable', async (event, { action, currentComponent, key, val
           }
         }
       } 
+
       // Process delete region request 
       if (action === 'delete') {
         console.log(`Deleted region: ${region}`);
@@ -973,7 +985,8 @@ ipcMain.on('update-variable', async (event, { action, currentComponent, key, val
           }
         }
       }
-
+      
+      // Process rename region request 
       if (action === 'rename') {
         console.log(`Renamed region ${region} to ${key}`);
         // Delete contents of variable with previous name 

@@ -1,9 +1,40 @@
 const { VueLoaderPlugin } = require('vue-loader');
 const path = require('path');
+const JavaScriptObfuscator = require('javascript-obfuscator');
+
+const isDev = process.env.NODE_ENV === 'development'; // Check if running in development or production
+
+// Custom plugin for JavaScript Obfuscator
+class JavaScriptObfuscatorWebpackPlugin {
+  constructor(options = {}) {
+    this.options = options;
+  }
+
+  apply(compiler) {
+    compiler.hooks.emit.tapAsync('JavaScriptObfuscatorWebpackPlugin', (compilation, callback) => {
+      const assets = compilation.assets;
+      
+      // Get the list of all JS assets and obfuscate them
+      Object.keys(assets).forEach((filename) => {
+        if (filename.endsWith('.js')) {
+          const originalSource = assets[filename].source();
+          const obfuscatedSource = JavaScriptObfuscator.obfuscate(originalSource, this.options).getObfuscatedCode();
+          
+          // Replace the original JS file with the obfuscated version
+          assets[filename] = {
+            source: () => obfuscatedSource,
+            size: () => obfuscatedSource.length
+          };
+        }
+      });
+      callback();
+    });
+  }
+}
 
 module.exports = {
   entry: './src/renderer/renderer.js',
-  mode: 'development',
+  mode: isDev ? 'development' : 'production',
   output: {
     path: path.resolve(__dirname, 'src/renderer'),
     filename: 'renderer.bundle.js'
@@ -42,7 +73,15 @@ module.exports = {
     ]
   },
   plugins: [
-    new VueLoaderPlugin()
+    new VueLoaderPlugin(),
+    // Add JavaScript Obfuscator for production builds only
+    ...(isDev ? [] : [
+      new JavaScriptObfuscatorWebpackPlugin({
+        rotateStringArray: true,
+        stringArray: true,
+        stringArrayThreshold: 0.75
+      }, ['renderer.bundle.js'])
+    ]),
   ],
   resolve: {
     alias: {
