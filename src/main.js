@@ -1,11 +1,11 @@
 // Import necessary modules from Electron and RobotJS
-const { app, Menu, BrowserWindow, globalShortcut } = require('electron'); // Electron APIs. Robotjs requires Electron v17.4.11
+const { app, Menu, BrowserWindow, screen, globalShortcut } = require('electron'); // Electron APIs. Robotjs requires Electron v17.4.11
 const { ipcMain } = require('electron'); // Transmit data to Vue components and back to main.js
 const robot = require('robotjs'); // RobotJS for taking screenshots and getting pixel color
 const fs = require('fs'); // Read from and write to {currentProfile}.ini and image files 
 const path = require('path'); // Module for handling and transforming file paths
 const OCRAD = require('ocrad.js');  // OCRAD to perform OCR on screenshots
-const { createCanvas, Image } = require('canvas');  // Used to modify screenshot images before OCR 
+const { createCanvas, Image, ImageData } = require('canvas');  // Used to modify screenshot images before OCR 
 const { PNG } = require('pngjs'); // For handling PNG image format
 const { spawn } = require('child_process'); // AutoHotkey scripts are spawned with parameters, and return stdout
 const Jimp = require('jimp'); // Used to modify screenshot images before OCR 
@@ -50,6 +50,10 @@ fs.readdir(configFolderPath, (err, files) => {
 // Tracks currently open component tab
 let currentComponent = 'ocrRegions'
 
+// Tracks user screen dimensions
+let screenWidth = 0;
+let screenHeight = 0;
+
 // Event listener for when the application is ready
 app.on('ready', () => {
   // Load config before creating the window
@@ -58,6 +62,11 @@ app.on('ready', () => {
   // Now create the windows after their config is loaded
   createWindow();
   createOverlayWindow();
+
+  // Get the user's screen dimensions
+  const primaryDisplay = screen.getPrimaryDisplay();
+  screenWidth = primaryDisplay.bounds.width;
+  screenHeight = primaryDisplay.bounds.height;
 });
 
 // Quit the app and save config data when all windows are closed, unless on macOS
@@ -320,7 +329,7 @@ function createWindow() {
           // If automation is live, run automate to determine what button to press, and press it with sendInput.ahk
           if (state['automation']['selected'].live) {
             const button = await automate(alertList);
-            console.log(button);
+            console.log(`Pressing button: ${button}`);
             await runAhkScript('sendInput', button, '');
             alertList.push('alertAutomation');
           }
@@ -471,6 +480,43 @@ async function captureAndProcessScreenshot(ocrRegion) {
   }
 }
 
+// Function to capture, save, and process screenshots
+async function processScreenshot(ocrRegion, screenshot) {
+  try {
+    // Capture the screen based on the passed ocrRegion and save the screenshot as PNG
+    await cropScreenshotAsPNG(ocrRegion, screenshot, unmodifiedImagePath);
+
+    // Process and save the modified image as another PNG
+    await processAndSaveModifiedImage(unmodifiedImagePath, modifiedImagePath, ocrRegion);
+
+    // Perform OCR on the modified image
+    const text = await recognizeTextFromImage(modifiedImagePath);
+    return text.trim(); // Return the recognized text
+  } catch (error) {
+    console.error('Error during OCR recognition:', error);
+    return ''; // Return empty string in case of error
+  }
+}
+
+// Capture screenshot as PNG
+function cropScreenshotAsPNG(captureRegion, screenshot, filePath) {
+  return new Promise((resolve, reject) => {
+    try {
+      // Save screenshot as PNG
+      const png = new PNG({ x: captureRegion.x, y: captureRegion.y, width: captureRegion.width, height: captureRegion.height });
+      png.data = Buffer.from(screenshot.image);
+      const buffer = PNG.sync.write(png);
+
+      fs.writeFile(filePath, buffer, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    } catch (error) {
+      reject(new Error(`Error capturing screenshot: ${error.message}`));
+    }
+  });
+}
+
 // Capture screenshot as PNG
 function captureScreenshotAsPNG(captureRegion, filePath) {
   return new Promise((resolve, reject) => {
@@ -609,6 +655,16 @@ function recognizeTextFromImage(imagePath) {
 // Function to evaluate user-defined conditions for alert visibility by performing OCR and checking pixel colors
 async function evaluateConditions() {
   let alerts = [];
+  let screenshot;
+
+  // Capture the full screen 
+  await new Promise((resolve) => {
+    process.nextTick(() => {
+      screenshot = robot.screen.capture(0, 0, screenWidth, screenHeight);
+      resolve();
+    });
+  });
+
   // Helper function to evaluate a single condition
   for (const [conditionKey, condition] of Object.entries(state['conditions'])) {
     // Ignore settings keys which don't contain a condition
@@ -618,12 +674,13 @@ async function evaluateConditions() {
     let truecount = 0;
     let falsecount = 0;
     let ocrText = '';
+
     // Evaluate OCR region text with regex if the user included an OCR region in this condition
     if (condition.ocrRegions) {
       // Perform OCR within the specified region
       const ocrRegionData = state['ocrRegions'][condition.ocrRegions];
       if (ocrRegionData) {
-        ocrText = await captureAndProcessScreenshot(ocrRegionData);
+        ocrText = await processScreenshot(ocrRegionData, screenshot);
 
         // Check if OCR result matches the regex
         if (ocrText) {
@@ -699,9 +756,17 @@ async function evaluateConditions() {
         const { x, y, color } = state['pixelCoords'][pixelCoord];
         const comparison = condition.pixelComparison[i];
         
-		
+    
         if (x && y) {
-          const colorAtPixel = robot.getPixelColor(x, y);
+          // Calculate the index of the pixel in the image buffer
+          const index = (y * screenshot.width + x) * 4;  // 4 bytes per pixel (BGRA)
+
+          // Extract RGBA values directly from the buffer (BGRA format)
+          const [b, g, r, a] = screenshot.image.slice(index, index + 4); 
+
+          // Convert to hexadecimal color (RGB)
+          const colorAtPixel = `${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+
           const matches = (comparison === "equals" && colorAtPixel === color) || 
           (comparison === "not equals" && colorAtPixel !== color);
 
@@ -715,6 +780,7 @@ async function evaluateConditions() {
               i=condition.pixelCoords.length;
             }
           }  
+
         } else {
           console.log('Pixel not in list');
         }
@@ -746,6 +812,7 @@ async function evaluateConditions() {
       alerts.push(condition.alert);
     }
   }  
+    
   return alerts;
 }
 
@@ -843,7 +910,7 @@ ipcMain.on('run-ahk-script', async (event, { scriptName, arg1, arg2 }) => {
 
 // Run Autohotkey scripts to capture user mouse clicks to select coordinates. 
 async function runAhkScript(scriptName, arg1, arg2) {
-  console.log('starting ahk script');
+  //console.log('starting ahk script');
   // getBoxCoords.ahk collects two mouse clicks, getPixelCoords.ahk collects one click
   const ahkExePath = path.join(basePath, `../scripts/${scriptName}.exe`);
   const ahkProcess = spawn(ahkExePath, [arg1, arg2]);
@@ -918,7 +985,7 @@ async function runAhkScript(scriptName, arg1, arg2) {
         const component = 'pixelCoords';
         win.webContents.send('updateConfig', { component, pixelData });
       } else if (scriptName === 'sendInput'){
-        console.log(`Script returned: `, output);
+        //console.log(`Script returned: `, output);
       }
 
       // Save new settings to {currentProfile}.ini
@@ -931,7 +998,7 @@ async function runAhkScript(scriptName, arg1, arg2) {
     console.error(`AHK Error: ${data}`);
   });
   ahkProcess.on('close', (code) => {
-    console.log(`AHK process exited with code ${code}`);
+    //console.log(`AHK process exited with code ${code}`);
   });
 };
 
