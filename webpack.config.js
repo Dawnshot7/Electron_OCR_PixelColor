@@ -36,7 +36,7 @@ module.exports = {
   entry: './src/renderer/renderer.js',
   mode: isDev ? 'development' : 'production',
   output: {
-    path: path.resolve(__dirname, 'src/renderer'),
+    path: path.resolve(__dirname, 'dist/renderer'),
     filename: 'renderer.bundle.js'
   },
   module: {

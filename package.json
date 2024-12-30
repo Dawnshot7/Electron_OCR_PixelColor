@@ -5,10 +5,11 @@
   "main": "src/main.js",
   "scripts": {
     "start": "cross-env NODE_ENV=development electron .",
+    "obfuscate": "node src/obfuscate-js.js",
     "build:webpack:dev": "cross-env NODE_ENV=development webpack --config webpack.config.js",
     "build:webpack": "cross-env NODE_ENV=production webpack --config webpack.config.js",
     "build:electron": "npm run build:webpack && electron-builder",
-    "build": "npm run build:electron"
+    "build": "npm run build:electron && npm run obfuscate"
   },
   "keywords": [],
   "author": "",
@@ -60,11 +61,29 @@
         "from": "src/config",
         "to": "app/src/config",
         "filter": ["**/*"]
+      },      
+      {
+        "from": "scripts",
+        "to": "app/scripts",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "dist/renderer",
+        "to": "app/src/renderer",
+        "filter": ["**/*"]
       },
       {
         "from": "src/renderer",
         "to": "app/src/renderer",
         "filter": ["**/*"]
+      },
+      {
+        "from": "src/preload.js",
+        "to": "app/src/preload.js"
+      },
+      {
+        "from": "src/overlayPreload.js",
+        "to": "app/src/overlayPreload.js"
       }
     ]
   }
