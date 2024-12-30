@@ -856,10 +856,13 @@ async function automate(alertList) {
       return false; // Return false for invalid conditions
     }
 
-    // Step 2: Replace alert indices with their evaluation logic
-    const conditionWithLogic = replaceAlertIndices(sanitizedCondition, alertsToCheck, alertList);
+    // Step 2: Transform to JavaScript-compatible syntax
+    const jsCondition = transformConditionToJS(sanitizedCondition);
 
-    // Step 3: Create a dynamic function to evaluate the condition
+    // Step 3: Replace alert indices with their evaluation logic
+    const conditionWithLogic = replaceAlertIndices(jsCondition, alertsToCheck, alertList);
+
+    // Step 4: Create a dynamic function to evaluate the condition
     try {
       const conditionFunction = new Function(`return ${conditionWithLogic};`);
       return conditionFunction(); // Evaluate the condition dynamically
@@ -877,7 +880,21 @@ async function automate(alertList) {
    */
   function sanitizeCondition(conditionString) {
     const validPattern = /^[\d\s()]+(?:and|or|not|[\d\s()])*$/gi;
-    return validPattern.test(conditionString) ? conditionString.toLowerCase() : null;
+    if (!validPattern.test(conditionString)) return null;
+    return conditionString.toLowerCase();
+  }
+
+  /**
+   * Transforms logical operators to JavaScript syntax.
+   * @param {string} sanitizedCondition - The sanitized condition string.
+   * @returns {string} - The transformed condition.
+   */
+  function transformConditionToJS(sanitizedCondition) {
+    return sanitizedCondition
+      .replace(/\band\b/g, "&&")
+      .replace(/\bor\b/g, "||")
+      .replace(/\bnot\b/g, "!")
+      .replace(/\s*([!&|()])\s*/g, '$1'); // Remove spaces around operators and parentheses
   }
 
   /**
