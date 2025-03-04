@@ -108,20 +108,6 @@ This Electron-based application allows users to automate gameplay in MMO RPGs by
 
 - ini & fs Modules: Handles saving and loading of user profiles.
 
-## Modules in main.js
-
-const { app, Menu, BrowserWindow, screen, globalShortcut } = require('electron'); // Electron APIs
-const { ipcMain } = require('electron'); // IPC for communication between renderer and main process
-const robot = require('robotjs'); // Pixel color monitoring
-const fs = require('fs'); // File system for saving/loading profiles
-const path = require('path'); // File path management
-const OCRAD = require('ocrad.js');  // OCR processing
-const { createCanvas, Image, ImageData } = require('canvas');  // Image manipulation for OCR
-const { PNG } = require('pngjs'); // PNG image handling
-const { spawn } = require('child_process'); // Runs AutoHotkey scripts
-const Jimp = require('jimp'); // Image processing
-const ini = require('ini'); // INI file handling
-
 ## Installation & Setup
 
 1. Clone this repository:
