@@ -1,74 +1,163 @@
-# Electron Pixel Color OCR
-This project allows you to capture a specific region of the screen using mouse clicks, extract text using OCR (Optical Character Recognition), and update the OCR region dynamically using AutoHotkey (AHK) for capturing the coordinates.
+## Electron Game Automation Tool
+
+## Overview
+
+This Electron-based application allows users to automate gameplay in MMO RPGs by monitoring pixel colors and performing OCR on specific screen regions. The app determines when certain abilities should be used based on real-time in-game data and can generate on-screen alerts or send simulated keypresses using AutoHotkey.
 
 ## Features
-- OCR-based screen capture: Capture a selected region of the screen and perform OCR to extract text from it.
-- Dynamic region selection: Use mouse clicks to select the region for OCR and update the OCR region in real time.
-- Integration with AutoHotkey: Use an AutoHotkey script to capture mouse coordinates for defining the OCR region.
 
-## Prerequisites
-- Before you begin, ensure you have the following installed:
+## Pixel & OCR Monitoring
 
-    - Node.js (v16.x or above)
-    - Electron (17.x or below for compatibility with robotjs if you're using it)
-    - AutoHotkey (v1.x for the scripts used in this project)
-    - ocrad.js (for OCR processing)
+- Users can select in-game pixels to monitor for color changes.
 
-- You can install the required Node.js packages by running the following command:
+- OCR functionality (via ocrad.js) can read text from defined screen regions.
 
-    bash
-    npm install
+- OCR settings include image inversion, brightness, and contrast adjustments to improve recognition accuracy.
 
-## Dependencies:
-- ocrad.js: A JavaScript-based OCR tool for extracting text from images.
-- AutoHotkeyA32.exe: For executing AutoHotkey scripts to capture mouse coordinates.
+## On-Screen Alerts
 
-## Project Setup
-- Clone this repository:
+- Custom alerts can be displayed when pixel color conditions or OCR-detected text matches user-defined triggers.
 
-    bash
-    git clone https://github.com/yourusername/Electron_PixelColor_OCR.git
-    cd Electron_PixelColor_OCR
+- Alerts appear via a transparent, click-through overlay.
 
-- Install dependencies:
+- Alerts are toggled every 0.5s (or a custom global cooldown).
 
-    bash
-    npm install
+## Decision Tree for Automation
 
-- Ensure you have AutoHotkey installed on your system, and place AutoHotkeyA32.exe and the AutoHotkey script (getBoxCoords.ahk) in the scripts folder.
+- Users define conditions based on pixel colors and OCR text.
 
-- Update the paths in your main.js file to reflect the location of AutoHotkeyA32.exe and the AHK script.
+- The app evaluates conditions in a loop and displays corresponding alerts when conditions are met.
+
+- Automation allows keypresses to be sent to the game, mimicking real user input.
+
+## User Profiles & Configuration
+
+- All settings are stored in .ini files.
+
+- Multiple profiles can be saved and loaded, useful for different characters or game roles.
+
+- Data is structured using JSON stringified state variables stored under different headings in the .ini file.
+
+## Components
+
+## 1. Pixel Selector
+
+- UI component for selecting pixels and defining the target color.
+
+- Uses robotjs to capture pixel color values in real-time.
+
+## 2. OCR Region Selector
+
+- UI for defining a screenshot region for OCR processing.
+
+- Includes settings for image preprocessing (contrast, brightness, inversion).
+
+- Uses ocrad.js to extract text from the region.
+
+## 3. On-Screen Alerts
+
+- Users create and customize alerts (text, color, size).
+
+- Alerts are conditionally displayed during gameplay.
+
+## 4. Condition Builder
+
+- Users define conditions using pixel colors and OCR results.
+
+- If a condition is met, a selected alert is shown.
+
+## 5. Automation System
+
+- Users build a list of conditions that trigger keypresses.
+
+- The app executes the first true condition, pressing the assigned key.
+
+- Automation follows a decision-tree structure to simulate optimal gameplay.
 
 ## How It Works
 
-- OCR Region Setup:
+1. The user sets up pixel monitoring and OCR text recognition.
 
-    - The user clicks the "Start Capture" button in the Electron window to begin selecting the OCR region.
-    - The user clicks and releases the left mouse button on the screen to define the coordinates for the OCR region.
-    - These coordinates are captured by an AutoHotkey script and returned to the Electron app.
+2. They configure alerts that will appear when conditions are met.
 
-- OCR Extraction:
+3. A decision tree is created to determine which abilities should be used.
 
-    - The Electron app uses the coordinates received from AutoHotkey to define the region for OCR.
-    - The OCR tool (ocrad.js) is then used to extract text from the captured region.
+4. The automation system evaluates the conditions every 0.5s (or a user-defined interval).
 
-- AutoHotkey Script:
+5. If a condition is met, the app:
 
-    - The AHK script (getBoxCoords.ahk) waits for the left mouse button to be pressed and released.
-    - It captures the x,y coordinates of the mouse clicks and outputs them to standard output (stdout).
-    - These coordinates are sent back to the Electron app and used to update the OCR region.
+  - Displays an alert.
 
-## Example Usage
-- Start Capture: Click the "Start Capture" button in the Electron window.
-- Select OCR Region: Click and release the left mouse button to define the coordinates for the OCR region.
-- OCR Output: The extracted text from the selected region will be printed to the console or displayed in the app.
+  - Optionally simulates a keypress.
 
-## Files and Structure
-- main.js: The main Electron app logic, including spawning the AutoHotkey script and handling OCR extraction.
-- renderer.js: Handles the front-end logic, including the event listener for the "Start Capture" button and mouse click events.
-- getBoxCoords.ahk: AutoHotkey script that captures the coordinates of the mouse clicks.
-- ocrad.js: The OCR tool for extracting text from images within the defined region.
+6. The system can be toggled on/off via hotkeys.
 
-## Troubleshooting
-- No OCR Output: Make sure the ocrad.js OCR region coordinates are correct and the OCR tool is functioning properly.
-- No Coordinates from AHK: Ensure that AutoHotkeyA32.exe is running correctly and the getBoxCoords.ahk script is properly outputting coordinates.
+## Technologies Used
+
+- Electron: Provides the main app framework.
+
+- Vue.js & BootstrapVue: Frontend UI components.
+
+- RobotJS: Captures pixel colors from the screen.
+
+- OCRAD.js: Performs OCR on screenshot regions.
+
+- Jimp & Canvas APIs: Preprocesses images before OCR.
+
+- AutoHotkey: Simulates keypresses for in-game automation.
+
+- ini & fs Modules: Handles saving and loading of user profiles.
+
+## Modules in main.js
+
+const { app, Menu, BrowserWindow, screen, globalShortcut } = require('electron'); // Electron APIs
+const { ipcMain } = require('electron'); // IPC for communication between renderer and main process
+const robot = require('robotjs'); // Pixel color monitoring
+const fs = require('fs'); // File system for saving/loading profiles
+const path = require('path'); // File path management
+const OCRAD = require('ocrad.js');  // OCR processing
+const { createCanvas, Image, ImageData } = require('canvas');  // Image manipulation for OCR
+const { PNG } = require('pngjs'); // PNG image handling
+const { spawn } = require('child_process'); // Runs AutoHotkey scripts
+const Jimp = require('jimp'); // Image processing
+const ini = require('ini'); // INI file handling
+
+## Installation & Setup
+
+1. Clone this repository:
+
+git clone https://github.com/your-repo-name.git
+cd your-repo-name
+
+2. Install dependencies:
+
+npm install
+
+3. Start the application:
+
+npm start
+
+## Usage
+
+- Open the application and configure pixel monitoring, OCR, alerts, and automation settings.
+
+- Save profiles for different characters or game setups.
+
+- Toggle automation and alerts as needed while playing.
+
+## Future Improvements
+
+- Enhance OCR accuracy with alternative libraries.
+
+- Add more advanced decision-tree automation options.
+
+- Improve UI for a more intuitive experience.
+
+## Disclaimer
+
+This tool is for educational and personal use only. The use of automation in online games may violate terms of service. Use at your own risk.
+
+## License
+
+## MIT License
+
